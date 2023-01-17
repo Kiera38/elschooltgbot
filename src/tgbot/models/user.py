@@ -1,7 +1,6 @@
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Dict, Union, Optional
 
 
 class UserRole(Enum):
@@ -11,36 +10,12 @@ class UserRole(Enum):
 
 @dataclass
 class User:
-    login: str = None
-    password: Optional[Union[str, List[int]]] = None
+    jwtoken: str = None
     quarter: int = None
     role: UserRole = UserRole.USER
     url: str = None
-    save_params: bool = False
-    cached_grades: Dict[str, Dict[str, Union[List[int], List[str]]]] = None
+    cached_grades: dict = None
     last_cache: float = 0
-
-    def __getstate__(self):
-        if self.save_params:
-            return {
-                'login': self.login,
-                'password': self.password,
-                'quarter': self.quarter,
-                'role': self.role,
-                'url': self.url,
-                'save_params': self.save_params
-            }
-        return {
-            'quarter': self.quarter,
-            'role': self.role,
-            'url': self.url,
-            'save_params': self.save_params
-        }
-
-    def __setstate__(self, state):
-        for key, value in state.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
 
     @property
     def has_cashed_grades(self):
