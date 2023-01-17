@@ -1,0 +1,3 @@
+ssh root@194.87.98.96
+
+0XQzrnqF2s
