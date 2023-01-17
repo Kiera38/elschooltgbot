@@ -47,6 +47,10 @@ class Repo:
     def remove_user(self, user_id):
         del self.users[user_id]
 
+    async def register_user(self, user_id, login, password):
+        user = self.get_user(user_id)
+        user.jwtoken = await self.elschool_repo.register(login, password)
+
     async def get_grades(self, user):
         if user.has_cashed_grades:
             logger.info('используются кешированные оценки')
@@ -54,13 +58,12 @@ class Repo:
         start = time.time()
         logger.info('получаем новые оценки')
         if user.url:
-            grades = await self.elschool_repo.get_grades(user.login, _decrypt_pass(user.password), user.url)
+            grades = await self.elschool_repo.get_grades(user.jwtoken, user.url)
         else:
-            grades, user.url = await self.elschool_repo.get_grades_and_url(user.login, _decrypt_pass(user.password))
+            grades, user.url = await self.elschool_repo.get_grades_and_url(user.jwtoken)
         user.update_cache(grades)
         end = time.time()
         logger.info(f'получены новые оценки за {end-start}')
-
         return grades, end - start
 
     def has_user(self, user_id):
@@ -76,18 +79,12 @@ class ElschoolRepo:
     def __init__(self):
         self._url = 'https://elschool.ru'
 
-    async def get_user_url(self, login, password):
-        async with aiohttp.ClientSession() as session:
-            await self._register(login, password, session)
-            return await self._get_url(session)
-
     async def _get_url(self, session):
         response = await session.get(f'{self._url}/users/diaries')
         return self._find_user_url(await response.text())
 
-    async def get_grades(self, login, password, url):
-        async with aiohttp.ClientSession() as session:
-            await self._register(login, password, session)
+    async def get_grades(self, jwtoken, url):
+        async with aiohttp.ClientSession(cookies={'JWToken': jwtoken}) as session:
             return await self._get_grades(url, session)
 
     async def _get_grades(self, url, session):
@@ -96,26 +93,37 @@ class ElschoolRepo:
             raise NoDataException(f"не удалось получить оценки с сервера, код ошибки {response.status}")
         return self._parse_grades(await response.text())
 
-    async def get_grades_and_url(self, login, password):
-        async with aiohttp.ClientSession() as session:
-            await self._register(login, password, session)
+    async def get_grades_and_url(self, jwtoken):
+        async with aiohttp.ClientSession(cookies={'JWToken': jwtoken}) as session:
             url = await self._get_url(session)
             grades = await self._get_grades(url, session)
             return grades, url
 
+    async def register(self, login, password):
+        async with aiohttp.ClientSession() as session:
+            await self._register(login, password, session)
+            jwtoken = session.cookie_jar.filter_cookies(self._url).get('JWToken')
+            logger.info(f'получен jwtoken: {jwtoken}')
+            if not jwtoken or not jwtoken.value:
+                raise NotRegisteredException('Регистрация удалась, но не найден токен. '
+                                             'Я пока не знаю, почему это могло произойти.'
+                                             'Скорее всего изменился способ работы регистрации.'
+                                             'Эта проверка существует потому что такое может произойти.'
+                                             'Это сообщение станет более информативным, когда я его получу.')
+            return jwtoken
+
     async def _register(self, login, password, session):
         payload = {
             'login': login,
-            'password': password,
-            'GoogleAuthCode': '',
+            'password': password
         }
         response = await session.post(f'{self._url}/Logon/Index', params=payload, ssl=False)
         logger.info(f'register response :{response}')
         if not response.ok:
-            raise NotRegisteredException(f"не удалось выполнить регистрацию, код сервера {response.status}")
+            raise NotRegisteredException(f"Не удалось выполнить регистрацию, код сервера {response.status}")
 
         if str(response.url) != 'https://elschool.ru/users/privateoffice':
-            raise NotRegisteredException("не удалась регистрация. Обычно такое происходит, "
+            raise NotRegisteredException("Не удалась регистрация. Обычно такое происходит, "
                                          "если не правильно указан логин или пароль."
                                          "Смена логина или пароля может помочь"
                                          f"твой логин: {fmt.hspoiler(login)} и пароль {fmt.hspoiler(password)}")
