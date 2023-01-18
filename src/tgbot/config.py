@@ -31,7 +31,7 @@ def load_config(path: str):
         tg_bot=TgBot(
             token=tg_bot.get("token"),
             admin_id=tg_bot.getint("admin_id"),
-            use_pickle_memory=tg_bot.getboolean("use_piclie_memory"),
+            use_pickle_memory=tg_bot.getboolean("use_pickle_memory"),
         ),
         data=DataConfig(**config["data"]),
     )

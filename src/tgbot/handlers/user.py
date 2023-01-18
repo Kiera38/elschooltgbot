@@ -1,3 +1,5 @@
+import inspect
+
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.types import Message
@@ -28,53 +30,14 @@ async def is_command(m: Message):
     return False
 
 
-async def command_with_params(m: Message, command, repo: Repo, state: FSMContext):
-    await state.update_data(command=command, message=m)
-    user = repo.get_user(m.from_id)
-    if not user.has_cashed_grades:
-        if not user.login:
-            await state.set_state(ParamsGetter.GET_LOGIN)
-            await m.answer('для продолжения работы потребуется ввести свой логин от elschool')
-            return
-        if not user.password:
-            await state.set_state(ParamsGetter.GET_PASSWORD)
-            await m.answer('для продолжения работы потребуется ввести свой пароль от elschool')
-            return
-    await command(m, repo, state, user)
-
-
-async def grades_command(m: Message, command, repo: Repo, state: FSMContext):
-    await state.update_data(grades_command=command)
-    await command_with_params(m, grades_cmd, repo, state)
-
-
-async def grades_cmd(m: Message, repo: Repo, state: FSMContext, user: User):
-    if user.has_cashed_grades:
-        await m.answer('есть сохранённые оценки, использую их')
-    else:
-        await m.answer('оценки не сохранены, начинаю получать новые оценки, пожалуйста подожди')
-    grades, time = await repo.get_grades(user)
-    if time:
-        await m.answer(f'оценки получены за {time:.2} c')
-    if not user.quarter:
-        await state.set_state(ParamsGetter.GET_QUARTER)
-        quarters = '\n'.join([f'{i}). {quarter}' for i, quarter in enumerate(grades, 1)])
-        await m.answer(f'какие оценки показать, укажи просто число, варианты \n{quarters}')
-        return
-    command = (await state.get_data())['grades_command']
-    await command(m, repo, state, list(grades.values())[user.quarter - 1])
-    await state.finish()
-
-
 async def get_user_login(m: Message, repo: Repo, state: FSMContext):
     if await is_command(m):
         return
     user = repo.get_user(m.from_id)
     user.login = m.text
     await m.delete()
-    await m.answer('логин сохранён')
-    data = await state.get_data()
-    await command_with_params(data['message'], data['command'], repo, state)
+    await m.answer('логин сохранён, теперь напиши пароль')
+    await state.set_state(ParamsGetter.GET_PASSWORD)
 
 
 async def get_user_password(m: Message, repo: Repo, state: FSMContext):
@@ -84,7 +47,10 @@ async def get_user_password(m: Message, repo: Repo, state: FSMContext):
     await m.delete()
     await m.answer('пароль сохранён')
     data = await state.get_data()
-    await command_with_params(data['message'], data['command'], repo, state)
+    partial_data = _check_spec(data['spec'], {'user': repo.get_user(m.from_id), 'repo': repo, 'state': state})
+    await data['command'](data['orig_msg'], **partial_data)
+    if data['finish_state']:
+        await state.finish()
 
 
 async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
@@ -99,7 +65,11 @@ async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
         await m.delete()
         data = await state.get_data()
         if data:
-            await grades_cmd(data['message'], repo, state, user)
+            partial_data = _check_spec(data['spec'], {'user': user, 'repo': repo, 'state': state,
+                                                      'grades': (await repo.get_grades(user))[user.quarter-1]})
+            await data['command'](m, **partial_data)
+            if data['finish_state']:
+                await state.finish()
         else:
             await state.finish()
 
@@ -109,23 +79,72 @@ async def user_start(m: Message):
                   "чтобы узнать как пользоваться используй /help")
 
 
-async def get_grades(m: Message, repo: Repo, state: FSMContext):
-    await grades_command(m, send_grades, repo, state)
+def _check_spec(spec: inspect.FullArgSpec, kwargs: dict):
+    if spec.varkw:
+        return kwargs
+
+    return {k: v for k, v in kwargs.items() if k in set(spec.args + spec.kwonlyargs)}
 
 
-async def send_grades(m: Message, repo: Repo, state: FSMContext, grades):
+def register_needed(finish_state=False):
+    def force_registered(command):
+        spec = inspect.getfullargspec(command)
+        async def registered(message: Message, repo: Repo, state: FSMContext, **kwargs):
+            user = repo.get_user(message.from_id)
+            if user.jwtoken is not None:
+                partial_data = _check_spec(spec, {'user': user, 'repo': repo, 'state': state, **kwargs})
+                await command(message, **partial_data)
+                if finish_state:
+                    await state.finish()
+            else:
+                await message.answer('похоже, что ты ещё не пробовал получать оценки. '
+                                     'Сейчас нужно будет указать свои данные от elschool. '
+                                     'Так я смогу получить всю нужную информацию. Эти данные я не собираюсь сохранять.')
+                await state.set_state(ParamsGetter.GET_LOGIN)
+                await state.update_data(command=command, spec=spec, finish_state=finish_state)
+
+        return registered
+    return force_registered
+
+def grades_command(finish_state=False):
+    def force_quarter(command):
+        spec = inspect.getfullargspec(command)
+        @register_needed()
+        async def quarter(m: Message, repo: Repo, state: FSMContext, user: User = None, **kwargs):
+            if user is None:
+                user = repo.get_user(m.from_id)
+            grades, time = await repo.get_grades(user)
+            if time:
+                await m.answer(f'оценки получены за {time:_.3f}')
+            if user.quarter:
+                partial_data = _check_spec(spec, {'user': user, 'repo': repo, 'state': state, 'grades': grades[user.quarter-1],**kwargs})
+                await command(m, **partial_data)
+                if finish_state:
+                    await state.finish()
+            else:
+                await state.set_state(ParamsGetter.GET_QUARTER)
+                await state.update_data(command=command, spec=spec, finish_state=finish_state)
+                quarters = '\n'.join(list(grades.keys()))
+                await m.answer(f'какие оценки показать, нужно просто число, варианты:\n{quarters}')
+
+        return quarter
+    return force_quarter
+
+
+@grades_command(True)
+async def get_grades(m: Message, grades):
     await m.answer(show_grades(grades))
 
 
-async def grades_one_lesson(m: Message, repo: Repo, state: FSMContext):
-    await grades_command(m, send_grades_one_lesson, repo, state)
-
-
-async def send_grades_one_lesson(m: Message, repo: Repo, state: FSMContext, grades):
+@grades_command(True)
+async def grades_one_lesson(m: Message, grades):
     grades = lower_keys(grades)
     lesson = m.text.lower()
     if lesson not in grades:
-        await m.answer('кажется, тебе хотелось не этого получить')
+        await m.answer(f'кажется, тебе хотелось не этого получить. '
+                       f'Если что, мне показалось, что ты хочешь получить оценки для {lesson}. '
+                       f'Такого названия урока нет. Если хотел сделать что-то другое можешь обратится к моему разработчику.'
+                       f'Он может добавить нужную функцию.')
         return
     await m.answer(show_grades_for_lesson(grades[lesson]))
 
@@ -139,45 +158,17 @@ async def clear_cache(m: Message, repo: Repo):
 async def update_cache(m: Message, repo: Repo, state: FSMContext):
     await clear_cache(m, repo)
     await m.answer('обновляю сохранённые оценки')
-    await grades_command(m, cache_updated, repo, state)
+    await cache_updated(m, repo, state)
 
 
-async def cache_updated(m: Message, repo: Repo, state: FSMContext, grades):
+@grades_command(True)
+async def cache_updated(m: Message):
     await m.answer('оценки обновлены')
-    await state.finish()
 
 
-async def fix_grades(m: Message, repo: Repo, state: FSMContext):
-    await grades_command(m, send_fix_grades, repo, state)
-
-
-async def send_fix_grades(m, repo, state, grades):
+@grades_command(True)
+async def fix_grades(m: Message, grades):
     await m.answer(show_fix_grades(grades))
-
-
-async def save_params_cmd(m: Message, repo: Repo, state: FSMContext):
-    await m.answer('надеюсь ты ознакомлен с моей политикой конфиденциальности.')
-    await command_with_params(m, save_params, repo, state)
-
-
-async def save_params(m: Message, repo: Repo, state: FSMContext, user):
-    user.save_params = True
-    await m.answer('параметры будут сохраняться при перезагрузках бота')
-    await state.finish()
-
-
-async def remove_params(m: Message, repo: Repo):
-    user = repo.get_user(m.from_id)
-    user.save_params = False
-    await m.answer('твои параметры больше не будут сохранятся при перезагрузках бота')
-
-
-async def remove_memory_params(m: Message, repo: Repo):
-    user = repo.get_user(m.from_id)
-    user.login = None
-    user.password = None
-    user.quarter = None
-    await m.answer('твои данные сброшены')
 
 
 async def version(m: Message):
@@ -242,7 +233,7 @@ async def change_quarter(m: Message, repo: Repo, state: FSMContext):
         quarters = '\n'.join([f'{i}). {quarter}' for i, quarter in enumerate(grades, 1)])
         await m.answer(f'выбери вариант, укажи просто число, варианты \n{quarters}')
     else:
-        await m.answer('оценки не получены, вариантов нет напиши просто число')
+        await m.answer('оценки не получены, вариантов нет, напиши просто число')
 
 
 async def privacy_policy(m: Message):
@@ -254,10 +245,6 @@ async def privacy_policy(m: Message):
 def register_user(dp: Dispatcher):
     dp.register_message_handler(cancel, commands='cancel', state='*')
     dp.register_message_handler(user_start, commands=["start"], state="*")
-
-    dp.register_message_handler(save_params_cmd, state=None, commands='save_params')
-    dp.register_message_handler(remove_params, state=None, commands='remove_params')
-    dp.register_message_handler(remove_memory_params, state=None, commands='remove_memory_params')
 
     dp.register_message_handler(get_user_login, state=ParamsGetter.GET_LOGIN)
     dp.register_message_handler(get_user_password, state=ParamsGetter.GET_PASSWORD)
