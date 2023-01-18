@@ -35,7 +35,7 @@ def show_grade(name, grade):
         return fmt.text(fmt.hunderline(name), fmt.hbold('нет оценок')), 0
     else:
         floor_gr = get_mean_gr([gra['grade'] for gra in grade])
-        return fmt.text(fmt.hunderline(name), gr, fmt.hitalic('средняя'), floor_gr), floor_gr
+        return fmt.text(fmt.hunderline(name), gr, fmt.hitalic('средняя'), f'{floor_gr:_.3f}'), floor_gr
 
 
 def lower_keys(grades):
