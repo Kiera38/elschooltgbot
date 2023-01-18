@@ -30,11 +30,10 @@ async def is_command(m: Message):
     return False
 
 
-async def get_user_login(m: Message, repo: Repo, state: FSMContext):
+async def get_user_login(m: Message, state: FSMContext):
     if await is_command(m):
         return
-    user = repo.get_user(m.from_id)
-    user.login = m.text
+    await state.update_data(login=m.text)
     await m.delete()
     await m.answer('логин сохранён, теперь напиши пароль')
     await state.set_state(ParamsGetter.GET_PASSWORD)
@@ -43,10 +42,12 @@ async def get_user_login(m: Message, repo: Repo, state: FSMContext):
 async def get_user_password(m: Message, repo: Repo, state: FSMContext):
     if await is_command(m):
         return
-    repo.set_user_password(m.from_id, m.text)
+
     await m.delete()
     await m.answer('пароль сохранён')
     data = await state.get_data()
+    await m.answer('проверка введённых данных, попытка регистрации')
+    await repo.register_user(m.from_id, data['login'], m.text)
     partial_data = _check_spec(data['spec'], {'user': repo.get_user(m.from_id), 'repo': repo, 'state': state})
     await data['command'](data['orig_msg'], **partial_data)
     if data['finish_state']:
@@ -65,9 +66,12 @@ async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
         await m.delete()
         data = await state.get_data()
         if data:
-            partial_data = _check_spec(data['spec'], {'user': user, 'repo': repo, 'state': state,
-                                                      'grades': (await repo.get_grades(user))[user.quarter-1]})
-            await data['command'](m, **partial_data)
+            grades, time = await repo.get_grades(user)
+            grades = list(grades.values)[user.quarter-1]
+            if time:
+                await m.answer(f'оценки получены за {time:_.3f}')
+            partial_data = _check_spec(data['spec'], {'user': user, 'repo': repo, 'state': state, 'grades': grades})
+            await data['command'](data['orig_msg'], **partial_data)
             if data['finish_state']:
                 await state.finish()
         else:
@@ -101,7 +105,7 @@ def register_needed(finish_state=False):
                                      'Сейчас нужно будет указать свои данные от elschool. '
                                      'Так я смогу получить всю нужную информацию. Эти данные я не собираюсь сохранять.')
                 await state.set_state(ParamsGetter.GET_LOGIN)
-                await state.update_data(command=command, spec=spec, finish_state=finish_state)
+                await state.update_data(command=command, spec=spec, finish_state=finish_state, orig_msg=message)
 
         return registered
     return force_registered
@@ -114,16 +118,17 @@ def grades_command(finish_state=False):
             if user is None:
                 user = repo.get_user(m.from_id)
             grades, time = await repo.get_grades(user)
+            grades = list(grades.values())[user.quarter - 1]
             if time:
                 await m.answer(f'оценки получены за {time:_.3f}')
             if user.quarter:
-                partial_data = _check_spec(spec, {'user': user, 'repo': repo, 'state': state, 'grades': grades[user.quarter-1],**kwargs})
+                partial_data = _check_spec(spec, {'user': user, 'repo': repo, 'state': state, 'grades': grades,**kwargs})
                 await command(m, **partial_data)
                 if finish_state:
                     await state.finish()
             else:
                 await state.set_state(ParamsGetter.GET_QUARTER)
-                await state.update_data(command=command, spec=spec, finish_state=finish_state)
+                await state.update_data(command=command, spec=spec, finish_state=finish_state, orig_msg=m)
                 quarters = '\n'.join(list(grades.keys()))
                 await m.answer(f'какие оценки показать, нужно просто число, варианты:\n{quarters}')
 
