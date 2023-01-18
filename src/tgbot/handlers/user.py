@@ -48,9 +48,13 @@ async def get_user_password(m: Message, repo: Repo, state: FSMContext):
     data = await state.get_data()
     await m.answer('проверка введённых данных, попытка регистрации')
     await repo.register_user(m.from_id, data['login'], m.text)
-    partial_data = _check_spec(data['spec'], {'user': repo.get_user(m.from_id), 'repo': repo, 'state': state})
-    await data['command'](data['orig_msg'], **partial_data)
-    if data['finish_state']:
+    await m.answer('удалось зарегистрироваться, данные введены правильно')
+    if data:
+        partial_data = _check_spec(data['spec'], {'user': repo.get_user(m.from_id), 'repo': repo, 'state': state})
+        await data['command'](data['orig_msg'], **partial_data)
+        if data['finish_state']:
+            await state.finish()
+    else:
         await state.finish()
 
 
@@ -242,9 +246,25 @@ async def change_quarter(m: Message, repo: Repo, state: FSMContext):
 
 
 async def privacy_policy(m: Message):
-    await m.answer("""
-Бот может работать без сбора данных, но для выполнения запросов на сервер elschool потребуется ввести логин и пароль. После ввода логина и пароля эти данные хранятся в оперативной памяти. В этом случае доступа к этим данным у разработчика нет.
-Чтобы не потерять данные между перезагрузками бота их можно сохранить на сервере. У разработчика нет прямого доступа к этм данным, но возможность их посмотреть все равно существует. Эту функцию нужно включать отдельно, по умолчанию она не включена.""")
+    await m.answer('это что-то похожее на политику конфиденциальности. '
+                   'Если кто-то напишет нормальную политику конфиденциальности, я её обновлю.')
+    await m.answer("Для получения оценок бот просит логин и пароль от журнала elschool. "
+                   "Эти данные используются только для получения токена. "
+                   "Этот токен используется для получения оценок. Никак выши данные из него получить нельзя")
+
+
+async def reregister(m: Message, state: FSMContext):
+    await m.answer('сейчас можно изменить свой логин и пароль, сначала введи новый логин')
+    await state.set_state(ParamsGetter.GET_LOGIN)
+
+
+async def unregister(m: Message, repo: Repo):
+    try:
+        repo.remove_user(m.from_id)
+    except KeyError:
+        await m.answer('ээээ. Ты куда собрался. Тебя нет в моём списке')
+    else:
+        await m.answer('я тебя удалил.')
 
 
 def register_user(dp: Dispatcher):
@@ -259,10 +279,15 @@ def register_user(dp: Dispatcher):
     dp.register_message_handler(fix_grades, commands='fix_grades', is_user=True)
 
     dp.register_message_handler(version, state='*', commands='version')
+    dp.register_message_handler(new_version, state='*', commands='new_version')
     dp.register_message_handler(help, state='*', commands='help')
     dp.register_message_handler(privacy_policy, state='*', commands='privacy_policy')
-    dp.register_message_handler(update_cache, commands="update_cache", is_user=True, state=None)
 
+    dp.register_message_handler(update_cache, commands="update_cache", is_user=True, state=None)
+    dp.register_message_handler(clear_cache, commands='clear_cache', state='*')
+
+    dp.register_message_handler(reregister, commands='reregister', state=None)
+    dp.register_message_handler(unregister, commands='unregister', state=None)
     dp.register_message_handler(change_quarter, commands='change_quarter', is_user=True, state=None)
 
     dp.register_message_handler(grades_one_lesson, state=None, is_user=True)

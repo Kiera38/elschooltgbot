@@ -12,15 +12,13 @@ def get_commands():
             BotCommand('/start', 'запустить бота'),
             BotCommand('/help', 'как пользоваться ботом'),
             BotCommand('/version', 'моя версия и список изменений'),
-            BotCommand('/save_params', 'сохранить параметры'),
-            BotCommand('/remove_params', 'удалить парамеры'),
-            BotCommand('/remove_memory_params', 'полностью удалить параметры'),
+            BotCommand('/new_version', 'список изменений в будущей версии'),
             BotCommand('/change_quarter', 'изменить четверть'),
+            BotCommand("/reregister", 'изменить свои данные'),
+            BotCommand('/unregister', 'удалить все данные'),
             BotCommand('/cancel', 'сбросить текущее состояние'),
             BotCommand("/update_cache", "обновить сохранённые оценки"),
-            BotCommand('/admin_scope', 'КОМАНДЫ ТОЛЬКО ДЛЯ РАЗРАБОТЧИКА БОТА'),
-            BotCommand('/send_message', 'отправить сообщение всем пользователям'),
-            BotCommand('/users_count', 'показать количество пользователей')]
+            BotCommand('/clear_cache', 'очистить сохранённые оценки')]
 
 
 async def admin_scope(m: Message):
