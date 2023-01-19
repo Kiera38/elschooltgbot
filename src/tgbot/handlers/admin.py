@@ -41,15 +41,9 @@ async def no_admin(m: Message):
     await m.answer('эээ ты что. Тебе не доступно это действие. Оно может использоваться только моим разработчиком.')
 
 
-async def cancel(m: Message, state: FSMContext):
-    await state.reset_state()
-    await m.answer('текущее состояние сброшено')
-
-
 def register_admin(dp: Dispatcher):
     dp.register_message_handler(admin_start, commands=["start"], state="*", role=UserRole.ADMIN)
     dp.register_message_handler(admin_send_messages, commands="send_message", state=None, is_admin=True)
     dp.register_message_handler(admin_message, state=AdminState.SEND_MESSAGE, is_admin=True)
     dp.register_message_handler(users_count, commands='users_count', is_admin=True)
-    dp.register_message_handler(cancel, commands='cancel', is_admin=True)
     dp.register_message_handler(no_admin, commands=['send_message', 'users_count'], is_admin=False)

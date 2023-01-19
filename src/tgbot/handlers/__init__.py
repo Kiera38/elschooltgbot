@@ -1,4 +1,5 @@
 from aiogram import Dispatcher
+from aiogram.dispatcher import FSMContext
 from aiogram.types import BotCommand, Message
 
 from tgbot.handlers.admin import register_admin
@@ -9,7 +10,7 @@ from tgbot.handlers.user import register_user
 def get_commands():
     return [BotCommand("/get_grades", "получить оценки"),
             BotCommand("/fix_grades", "исправить все оценки"),
-            BotCommand('/start', 'запустить бота'),
+            BotCommand('/start', 'запустить бота и добавить в список пользователей'),
             BotCommand('/help', 'как пользоваться ботом'),
             BotCommand('/version', 'моя версия и список изменений'),
             BotCommand('/new_version', 'список изменений в будущей версии'),
@@ -25,7 +26,12 @@ async def admin_scope(m: Message):
     await m.answer('это не команда! Только разделитель. Команды под этим разделителем тебе не доступны')
 
 
+async def cancel(m: Message, state: FSMContext):
+    await state.reset_state()
+    await m.answer('текущее состояние сброшено')
+
 def register_handlers(dp: Dispatcher):
+    dp.register_message_handler(cancel, commands='cancel', state='*')
     dp.register_message_handler(admin_scope, commands='admin_scope')
     register_admin(dp)
     register_user(dp)

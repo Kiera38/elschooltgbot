@@ -206,7 +206,10 @@ async def version(m: Message):
 async def new_version(m: Message):
     await m.answer("""В следующем обновлении:
     
-Взаимодействие с ботом через кнопки (через команды также можно) 
+сделано:
+Взаимодействие с ботом через кнопки (через команды также можно)
+
+будет сделано: 
 Нормальная регистрация (разобрался, как можно сделать)
 переход на aiogram 3.x
 Некоторые мелкие изменения
@@ -222,21 +225,18 @@ async def help(m: Message):
 /fix_grades - получить все оценки и как можно их исправить
 /help - показать это сообщение
 /version - показать версию и список изменений в последнем обновлении
-/save_params - сохранять параметры между перезагрузками бота
-/remove_params - перестать сохранять параметры между перезагрузками бота
-/remove_memory_params - удалить все данные о пользователе (придётся вводить заново)
+/new_version - показать , что будет в следующем обновлении
 /privacy_policy - посмотреть политику конфиденциальности 
 /cancel - сбросить текущее состояние
+/clear_cache - удалить сохранённые оценки.
 /update_cache - обновить сохранённые оценки. Для скорости и некоторых других функций оценки хранятся в течение 1 часа, если по какой-то причине нужно их обновить можно использовать эту команду
+/change_quarter - изменить четверть (полугодие)
+/reregister - изменить данные 
+/unregister - удалить все данные
 
 Команды, которые получают оценки могут потребовать логин и пароль. Доступа к этим данным у разработчика нет. Всё это описано в политике конфиденциальности. 
 
 Также, если просто написать название урока можно получить подробную информацию по каждой оценке""")
-
-
-async def cancel(m: Message, state: FSMContext):
-    await state.reset_state()
-    await m.answer('текущее состояние сброшено')
 
 
 async def change_quarter(m: Message, repo: Repo, state: FSMContext):
@@ -272,8 +272,12 @@ async def unregister(m: Message, repo: Repo):
         await m.answer('я тебя удалил.')
 
 
+async def no_user(m: Message, repo: Repo):
+    await m.answer('тебя нет в списке пользователей, сейчас добавлю')
+    await user_start(m, repo)
+
+
 def register_user(dp: Dispatcher):
-    dp.register_message_handler(cancel, commands='cancel', state='*')
     dp.register_message_handler(user_start, commands=["start"], state="*")
 
     dp.register_message_handler(get_user_login, state=ParamsGetter.GET_LOGIN)
@@ -281,7 +285,7 @@ def register_user(dp: Dispatcher):
     dp.register_message_handler(get_user_quarter, state=ParamsGetter.GET_QUARTER)
 
     dp.register_message_handler(get_grades, state=None, commands="get_grades", is_user=True)
-    dp.register_message_handler(fix_grades, commands='fix_grades', is_user=True)
+    dp.register_message_handler(fix_grades, state=None, commands='fix_grades', is_user=True)
 
     dp.register_message_handler(version, state='*', commands='version')
     dp.register_message_handler(new_version, state='*', commands='new_version')
@@ -289,11 +293,12 @@ def register_user(dp: Dispatcher):
     dp.register_message_handler(privacy_policy, state='*', commands='privacy_policy')
 
     dp.register_message_handler(update_cache, commands="update_cache", is_user=True, state=None)
-    dp.register_message_handler(clear_cache, commands='clear_cache', state='*')
+    dp.register_message_handler(clear_cache, commands='clear_cache', state=None)
 
-    dp.register_message_handler(reregister, commands='reregister', state=None)
-    dp.register_message_handler(unregister, commands='unregister', state=None)
+    dp.register_message_handler(reregister, commands='reregister', state=None, is_user=True)
+    dp.register_message_handler(unregister, commands='unregister', state=None, is_user=True)
     dp.register_message_handler(change_quarter, commands='change_quarter', is_user=True, state=None)
 
     dp.register_message_handler(grades_one_lesson, state=None, is_user=True)
+    dp.register_message_handler(no_user, state='*', is_user=False)
 
