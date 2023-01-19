@@ -113,6 +113,7 @@ def register_needed(finish_state=False):
                 await message.answer('похоже, что ты ещё не пробовал получать оценки. '
                                      'Сейчас нужно будет указать свои данные от elschool. '
                                      'Так я смогу получить всю нужную информацию. Эти данные я не собираюсь сохранять.')
+                await message.answer('сейчас введи логин')
                 await state.set_state(ParamsGetter.GET_LOGIN)
                 await state.update_data(command=command, spec=spec, finish_state=finish_state, orig_msg=message)
 
