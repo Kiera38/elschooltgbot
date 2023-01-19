@@ -11,20 +11,20 @@ from tgbot.states.user import ParamsGetter
 
 
 async def is_command(m: Message):
-    if m.text in ["/get_grades",
-                  "/fix_grades",
-                  '/start',
-                  '/help',
-                  '/version',
-                  '/save_params',
-                  '/remove_params',
-                  '/remove_memory_params'
-                  '/change_quarter',
-                  '/cancel',
-                  "/update_cache",
-                  '/admin_scope',
-                  '/send_message',
-                  '/users_count']:
+    if m.text in [
+        "/get_grades",
+        "/fix_grades",
+        '/start',
+        '/help',
+        '/version',
+        '/change_quarter',
+        '/cancel',
+        "/update_cache",
+        '/clear_cache',
+        '/new_version',
+        '/reregister',
+        '/unregister'
+    ]:
         await m.answer('по моему ты написал одну из моих команд. Тебя что попросили написать?')
         return True
     return False
