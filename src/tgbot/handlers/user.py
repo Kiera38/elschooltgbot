@@ -126,6 +126,10 @@ def grades_command(finish_state=False):
         async def quarter(m: Message, repo: Repo, state: FSMContext, user: User = None, **kwargs):
             if user is None:
                 user = repo.get_user(m.from_id)
+            if user.has_cashed_grades:
+                await m.answer('есть сохранённые оценки, использую их')
+            else:
+                await m.answer('оценки не сохранены, получаю новые оценки, пожалуйста подожди')
             grades, time = await repo.get_grades(user)
             if time:
                 await m.answer(f'оценки получены за {time:_.3f}')
@@ -257,7 +261,7 @@ async def privacy_policy(m: Message):
                    'Если кто-то напишет нормальную политику конфиденциальности, я её обновлю.')
     await m.answer("Для получения оценок бот просит логин и пароль от журнала elschool. "
                    "Эти данные используются только для получения токена. "
-                   "Этот токен используется для получения оценок. Никак выши данные из него получить нельзя")
+                   "Этот токен используется для получения оценок. Никак ваши данные из него получить нельзя")
 
 
 async def reregister(m: Message, state: FSMContext):
