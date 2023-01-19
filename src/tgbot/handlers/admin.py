@@ -1,10 +1,8 @@
-import asyncio
 import traceback
 
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.types import Message
-from aiogram.utils.exceptions import BotBlocked
 
 from tgbot.handlers.user import user_start
 from tgbot.models.user import UserRole
@@ -12,9 +10,9 @@ from tgbot.services.repository import Repo
 from tgbot.states.user import AdminState
 
 
-async def admin_start(m: Message):
+async def admin_start(m: Message, repo: Repo):
     await m.reply("Hello, admin!")
-    await user_start(m)
+    await user_start(m, repo)
 
 
 async def admin_send_messages(m: Message, state: FSMContext):

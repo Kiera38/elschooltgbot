@@ -70,8 +70,12 @@ async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
         await m.delete()
         data = await state.get_data()
         if data:
+            if user.has_cashed_grades:
+                await m.answer('есть сохранённые оценки, использую их')
+            else:
+                await m.answer('оценки не сохранены, получаю новые оценки, пожалуйста подожди')
             grades, time = await repo.get_grades(user)
-            grades = list(grades.values)[user.quarter-1]
+            grades = list(grades.values())[user.quarter-1]
             if time:
                 await m.answer(f'оценки получены за {time:_.3f}')
             partial_data = _check_spec(data['spec'], {'user': user, 'repo': repo, 'state': state, 'grades': grades})
@@ -82,9 +86,10 @@ async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
             await state.finish()
 
 
-async def user_start(m: Message):
+async def user_start(m: Message, repo: Repo):
     await m.reply("привет, я могу присылать тебе оценки из электронного журнала elschool и подсказывать как их испавить\n"
                   "чтобы узнать как пользоваться используй /help")
+    repo.add_user(m.from_id, User())
 
 
 def _check_spec(spec: inspect.FullArgSpec, kwargs: dict):
@@ -122,10 +127,10 @@ def grades_command(finish_state=False):
             if user is None:
                 user = repo.get_user(m.from_id)
             grades, time = await repo.get_grades(user)
-            grades = list(grades.values())[user.quarter - 1]
             if time:
                 await m.answer(f'оценки получены за {time:_.3f}')
             if user.quarter:
+                grades = list(grades.values())[user.quarter - 1]
                 partial_data = _check_spec(spec, {'user': user, 'repo': repo, 'state': state, 'grades': grades,**kwargs})
                 await command(m, **partial_data)
                 if finish_state:
