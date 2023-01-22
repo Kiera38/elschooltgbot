@@ -2,10 +2,7 @@ from aiogram import Dispatcher
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BotCommand, Message
-
-from tgbot.handlers.admin import register_admin
-from tgbot.handlers.errors import register_errors
-from tgbot.handlers.user import register_user
+from tgbot.handlers import user, admin, errors
 
 
 def get_commands():
@@ -34,6 +31,6 @@ async def cancel(m: Message, state: FSMContext):
 def register_handlers(dp: Dispatcher):
     dp.message.register(cancel, Command('cancel'), StateFilter('*'))
     dp.message.register(admin_scope, Command('admin_scope'))
-    register_admin(dp)
-    register_user(dp)
-    register_errors(dp)
+    admin.register_admin(dp)
+    user.register_user(dp)
+    errors.register_errors(dp)

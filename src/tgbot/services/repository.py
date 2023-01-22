@@ -1,10 +1,12 @@
+#
+
 import logging
 import time
 from typing import List, Dict
 
 import aiohttp
 from bs4 import BeautifulSoup
-import aiogram.utils.markdown as fmt
+from aiogram import html
 
 from tgbot.models.user import User
 
@@ -99,9 +101,8 @@ class ElschoolRepo:
 
             if str(response.url) != 'https://elschool.ru/users/privateoffice':
                 raise NotRegisteredException("Не удалась регистрация. Обычно такое происходит, "
-                                             "если не правильно указан логин или пароль."
-                                             "Смена логина или пароля может помочь"
-                                             f"твой логин: {fmt.hspoiler(login)} и пароль {fmt.hspoiler(password)}")
+                                             "если не правильно указан логин или пароль. "
+                                             "Попробуй изменить логин или пароль ", login=login, password=password)
 
             jwtoken = session.cookie_jar.filter_cookies(self._url).get('JWToken')
             logger.info(f'получен jwtoken: {jwtoken}')
@@ -142,7 +143,10 @@ class ElschoolRepo:
 
 
 class NotRegisteredException(Exception):
-    pass
+    def __init__(self, *args, login=None, password=None):
+        super().__init__(*args)
+        self.login = login
+        self.password=password
 
 class NoDataException(Exception):
     pass

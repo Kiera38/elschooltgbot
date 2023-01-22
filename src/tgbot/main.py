@@ -17,7 +17,7 @@ async def set_bot_commands(bot: Bot):
 
 
 async def run_bot():
-    handlers = logging.FileHandler('bot.log', encoding='utf-8'), logging.StreamHandler()
+    handlers = logging.FileHandler('bot.log'), logging.StreamHandler()
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -30,7 +30,9 @@ async def run_bot():
 
     bot = Bot(token=config.tg_bot.token, parse_mode='HTML')
     dp = Dispatcher(storage=storage)
-    dp.message.outer_middleware(RoleMiddleware(config.tg_bot.admin_id))
+    role_middleware = RoleMiddleware(config.tg_bot.admin_id)
+    dp.message.outer_middleware(role_middleware)
+    dp.errors.middleware(role_middleware)
     dp.message.outer_middleware(DataMiddleware(config.data.users_pkl_file))
     register_handlers(dp)
 
