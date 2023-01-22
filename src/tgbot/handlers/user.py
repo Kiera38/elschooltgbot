@@ -1,14 +1,18 @@
 import inspect
 
-from aiogram import Dispatcher
-from aiogram.dispatcher import FSMContext
+from aiogram import Dispatcher, Router
+from aiogram.filters import StateFilter, Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
+from tgbot.filters.user import RegisteredUserFilter
 from tgbot.handlers.utils import show_grades, lower_keys, show_grades_for_lesson, show_fix_grades
 from tgbot.models.user import User
 from tgbot.services.repository import Repo
 from tgbot.states.user import ParamsGetter
 
+
+user_router = Router()
 
 async def is_command(m: Message):
     if m.text in [
@@ -30,6 +34,7 @@ async def is_command(m: Message):
     return False
 
 
+@user_router.message(StateFilter(ParamsGetter.GET_LOGIN))
 async def get_user_login(m: Message, state: FSMContext):
     if await is_command(m):
         return
@@ -39,6 +44,7 @@ async def get_user_login(m: Message, state: FSMContext):
     await state.set_state(ParamsGetter.GET_PASSWORD)
 
 
+@user_router.message(StateFilter(ParamsGetter.GET_PASSWORD))
 async def get_user_password(m: Message, repo: Repo, state: FSMContext):
     if await is_command(m):
         return
@@ -47,24 +53,25 @@ async def get_user_password(m: Message, repo: Repo, state: FSMContext):
     await m.answer('пароль сохранён')
     data = await state.get_data()
     await m.answer('проверка введённых данных, попытка регистрации')
-    await repo.register_user(m.from_id, data['login'], m.text)
+    await repo.register_user(m.from_user.id, data['login'], m.text)
     await m.answer('удалось зарегистрироваться, данные введены правильно')
     if data:
-        partial_data = _check_spec(data['spec'], {'user': repo.get_user(m.from_id), 'repo': repo, 'state': state})
+        partial_data = _check_spec(data['spec'], {'user': repo.get_user(m.from_user.id), 'repo': repo, 'state': state})
         await data['command'](data['orig_msg'], **partial_data)
         if data['finish_state']:
-            await state.finish()
+            await state.clear()
     else:
-        await state.finish()
+        await state.clear()
 
 
+@user_router.message(StateFilter(ParamsGetter.GET_QUARTER))
 async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
     if await is_command(m):
         return
     if not m.text.isdigit():
         await m.answer(f'должно быть число, например 1, не {m.text}')
     else:
-        user = repo.get_user(m.from_id)
+        user = repo.get_user(m.from_user.id)
         user.quarter = int(m.text)
         await m.answer('сохранено')
         await m.delete()
@@ -81,15 +88,16 @@ async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
             partial_data = _check_spec(data['spec'], {'user': user, 'repo': repo, 'state': state, 'grades': grades})
             await data['command'](data['orig_msg'], **partial_data)
             if data['finish_state']:
-                await state.finish()
+                await state.clear()
         else:
-            await state.finish()
+            await state.clear()
 
 
+@user_router.message(Command('start'))
 async def user_start(m: Message, repo: Repo):
     await m.reply("привет, я могу присылать тебе оценки из электронного журнала elschool и подсказывать как их испавить\n"
                   "чтобы узнать как пользоваться используй /help")
-    repo.add_user(m.from_id, User())
+    repo.add_user(m.from_user.id, User())
 
 
 def _check_spec(spec: inspect.FullArgSpec, kwargs: dict):
@@ -103,12 +111,12 @@ def register_needed(finish_state=False):
     def force_registered(command):
         spec = inspect.getfullargspec(command)
         async def registered(message: Message, repo: Repo, state: FSMContext, **kwargs):
-            user = repo.get_user(message.from_id)
+            user = repo.get_user(message.from_user.id)
             if user.jwtoken is not None:
                 partial_data = _check_spec(spec, {'user': user, 'repo': repo, 'state': state, **kwargs})
                 await command(message, **partial_data)
                 if finish_state:
-                    await state.finish()
+                    await state.clear()
             else:
                 await message.answer('похоже, что ты ещё не пробовал получать оценки. '
                                      'Сейчас нужно будет указать свои данные от elschool. '
@@ -126,7 +134,7 @@ def grades_command(finish_state=False):
         @register_needed()
         async def quarter(m: Message, repo: Repo, state: FSMContext, user: User = None, **kwargs):
             if user is None:
-                user = repo.get_user(m.from_id)
+                user = repo.get_user(m.from_user.id)
             if user.has_cashed_grades:
                 await m.answer('есть сохранённые оценки, использую их')
             else:
@@ -139,7 +147,7 @@ def grades_command(finish_state=False):
                 partial_data = _check_spec(spec, {'user': user, 'repo': repo, 'state': state, 'grades': grades,**kwargs})
                 await command(m, **partial_data)
                 if finish_state:
-                    await state.finish()
+                    await state.clear()
             else:
                 await state.set_state(ParamsGetter.GET_QUARTER)
                 await state.update_data(command=command, spec=spec, finish_state=finish_state, orig_msg=m)
@@ -150,30 +158,19 @@ def grades_command(finish_state=False):
     return force_quarter
 
 
+@user_router.message(Command('get_grades'))
 @grades_command(True)
 async def get_grades(m: Message, grades):
     await m.answer(show_grades(grades))
 
-
-@grades_command(True)
-async def grades_one_lesson(m: Message, grades):
-    grades = lower_keys(grades)
-    lesson = m.text.lower()
-    if lesson not in grades:
-        await m.answer(f'кажется, тебе хотелось не этого получить. '
-                       f'Если что, мне показалось, что ты хочешь получить оценки для {lesson}. '
-                       f'Такого названия урока нет. Если хотел сделать что-то другое можешь обратится к моему разработчику.'
-                       f'Он может добавить нужную функцию.')
-        return
-    await m.answer(show_grades_for_lesson(grades[lesson]))
-
-
+@user_router.message(Command('clear_cache'))
 async def clear_cache(m: Message, repo: Repo):
     await m.answer('очищаю сохранённые оценки')
     user = repo.get_user(m.from_user.id)
     user.cached_grades = None
 
 
+@user_router.message(Command('update_cache'))
 async def update_cache(m: Message, repo: Repo, state: FSMContext):
     await clear_cache(m, repo)
     await m.answer('обновляю сохранённые оценки')
@@ -185,11 +182,12 @@ async def cache_updated(m: Message):
     await m.answer('оценки обновлены')
 
 
+@user_router.message(Command('fix_grades'))
 @grades_command(True)
 async def fix_grades(m: Message, grades):
     await m.answer(show_fix_grades(grades))
 
-
+@user_router.message(Command('version'))
 async def version(m: Message):
     await m.answer("""моя версия: 1.5.8
 список изменений:
@@ -208,6 +206,7 @@ async def version(m: Message):
 больше нельзя написать команду вместо чего-то, что просит бот""")
 
 
+@user_router.message(Command('new_version'))
 async def new_version(m: Message):
     await m.answer("""В следующем обновлении:
     
@@ -224,6 +223,7 @@ async def new_version(m: Message):
 """)
 
 
+@user_router.message(Command('help'))
 async def help(m: Message):
     await m.answer("""я могу присылать тебе оценки из электронного журнала elschool и подсказывать как их испавить
 
@@ -246,8 +246,9 @@ async def help(m: Message):
 Также, если просто написать название урока можно получить подробную информацию по каждой оценке""")
 
 
+@user_router.message(Command('change_quarter'))
 async def change_quarter(m: Message, repo: Repo, state: FSMContext):
-    user = repo.get_user(m.from_id)
+    user = repo.get_user(m.from_user.id)
     await state.set_state(ParamsGetter.GET_QUARTER)
     if user.cached_grades:
         grades = user.cached_grades
@@ -257,6 +258,7 @@ async def change_quarter(m: Message, repo: Repo, state: FSMContext):
         await m.answer('оценки не получены, вариантов нет, напиши просто число')
 
 
+@user_router.message(Command('privacy_policy'))
 async def privacy_policy(m: Message):
     await m.answer('это что-то похожее на политику конфиденциальности. '
                    'Если кто-то напишет нормальную политику конфиденциальности, я её обновлю.')
@@ -265,14 +267,16 @@ async def privacy_policy(m: Message):
                    "Этот токен используется для получения оценок. Никак ваши данные из него получить нельзя")
 
 
+@user_router.message(Command('reregister'))
 async def reregister(m: Message, state: FSMContext):
     await m.answer('сейчас можно изменить свой логин и пароль, сначала введи новый логин')
     await state.set_state(ParamsGetter.GET_LOGIN)
 
 
+@user_router.message(Command('unregister'))
 async def unregister(m: Message, repo: Repo):
     try:
-        repo.remove_user(m.from_id)
+        repo.remove_user(m.from_user.id)
     except KeyError:
         await m.answer('ээээ. Ты куда собрался. Тебя нет в моём списке')
     else:
@@ -284,28 +288,21 @@ async def no_user(m: Message, repo: Repo):
     await user_start(m, repo)
 
 
+@user_router.message()
+@grades_command(True)
+async def grades_one_lesson(m: Message, grades):
+    grades = lower_keys(grades)
+    lesson = m.text.lower()
+    if lesson not in grades:
+        await m.answer(f'кажется, тебе хотелось не этого получить. '
+                       f'Если что, мне показалось, что ты хочешь получить оценки для {lesson}. '
+                       f'Такого названия урока нет. Если хотел сделать что-то другое можешь обратится к моему разработчику.'
+                       f'Он может добавить нужную функцию.')
+        return
+    await m.answer(show_grades_for_lesson(grades[lesson]))
+
+
 def register_user(dp: Dispatcher):
-    dp.register_message_handler(user_start, commands=["start"], state="*")
-
-    dp.register_message_handler(get_user_login, state=ParamsGetter.GET_LOGIN)
-    dp.register_message_handler(get_user_password, state=ParamsGetter.GET_PASSWORD)
-    dp.register_message_handler(get_user_quarter, state=ParamsGetter.GET_QUARTER)
-
-    dp.register_message_handler(get_grades, state=None, commands="get_grades", is_user=True)
-    dp.register_message_handler(fix_grades, state=None, commands='fix_grades', is_user=True)
-
-    dp.register_message_handler(version, state='*', commands='version')
-    dp.register_message_handler(new_version, state='*', commands='new_version')
-    dp.register_message_handler(help, state='*', commands='help')
-    dp.register_message_handler(privacy_policy, state='*', commands='privacy_policy')
-
-    dp.register_message_handler(update_cache, commands="update_cache", is_user=True, state=None)
-    dp.register_message_handler(clear_cache, commands='clear_cache', state=None)
-
-    dp.register_message_handler(reregister, commands='reregister', state=None, is_user=True)
-    dp.register_message_handler(unregister, commands='unregister', state=None, is_user=True)
-    dp.register_message_handler(change_quarter, commands='change_quarter', is_user=True, state=None)
-
-    dp.register_message_handler(grades_one_lesson, state=None, is_user=True)
-    dp.register_message_handler(no_user, state='*', is_user=False)
+    dp.include_router(user_router)
+    dp.message.register(no_user, RegisteredUserFilter(False))
 

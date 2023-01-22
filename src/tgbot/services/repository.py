@@ -111,7 +111,7 @@ class ElschoolRepo:
                                              'Скорее всего изменился способ работы регистрации у elschool.'
                                              'Эта проверка существует потому что такое может произойти.'
                                              'Это сообщение станет более информативным, когда я его получу.')
-            return jwtoken
+            return jwtoken.value
 
     @staticmethod
     def _parse_grades(html):

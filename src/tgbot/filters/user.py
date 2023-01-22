@@ -1,18 +1,16 @@
-from aiogram.dispatcher.filters import BoundFilter
-from aiogram.dispatcher.handler import ctx_data
-from aiogram.types.base import TelegramObject
+from typing import Any, Union, Dict
+
+from aiogram.filters import BaseFilter
+from aiogram.types import User, Message
+
+from tgbot.services.repository import Repo
 
 
-class RegisteredUserFilter(BoundFilter):
-    key = 'is_user'
+class RegisteredUserFilter(BaseFilter):
+    async def __call__(self, message: Message, event_from_user: User, repo: Repo) -> Union[bool, Dict[str, Any]]:
+        return repo.has_user(event_from_user.id) == self.is_user
 
     def __init__(self, is_user: bool):
         self.is_user = is_user
 
-    async def check(self, arg: TelegramObject) -> bool:
-        data = ctx_data.get()
-        from_user = getattr(arg, 'from_user')
-        if from_user is not None:
-            return data.get("repo").has_user(from_user.id) == self.is_user
-        return False
 

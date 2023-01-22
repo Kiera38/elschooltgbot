@@ -1,14 +1,18 @@
 import typing
+from typing import Any, Union, Dict
 
-from aiogram.dispatcher.filters import BoundFilter
-from aiogram.dispatcher.handler import ctx_data
+from aiogram.filters import BaseFilter
+from aiogram.types import Message
 from aiogram.types.base import TelegramObject
 
 from tgbot.models.user import UserRole
 
 
-class RoleFilter(BoundFilter):
-    key = 'role'
+class RoleFilter(BaseFilter):
+    async def __call__(self, message: Message, role: UserRole) -> Union[bool, Dict[str, Any]]:
+        if self.roles is None:
+            return True
+        return role in self.roles
 
     def __init__(
         self,
@@ -21,21 +25,10 @@ class RoleFilter(BoundFilter):
         else:
             self.roles = set(role)
 
-    async def check(self, obj: TelegramObject):
-        if self.roles is None:
-            return True
-        data = ctx_data.get()
-        return data.get("role") in self.roles
 
-
-class AdminFilter(BoundFilter):
-    key = 'is_admin'
+class AdminFilter(BaseFilter):
+    async def __call__(self, message: Message, is_admin: bool) -> Union[bool, Dict[str, Any]]:
+        return is_admin == self.is_admin
 
     def __init__(self, is_admin: typing.Optional[bool] = None):
         self.is_admin = is_admin
-
-    async def check(self, obj: TelegramObject):
-        if self.is_admin is None:
-            return True
-        data = ctx_data.get()
-        return (data.get("role") is UserRole.ADMIN) == self.is_admin

@@ -1,38 +1,47 @@
 import traceback
 
-from aiogram import Dispatcher
-from aiogram.dispatcher import FSMContext
+from aiogram import Dispatcher, Router, Bot
+from aiogram.filters import Command, StateFilter
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
+from tgbot.filters.role import RoleFilter
 from tgbot.handlers.user import user_start
 from tgbot.models.user import UserRole
 from tgbot.services.repository import Repo
 from tgbot.states.user import AdminState
 
 
+admin_router = Router()
+admin_router.message.filter(RoleFilter(UserRole.ADMIN))
+
+@admin_router.message(Command('start'))
 async def admin_start(m: Message, repo: Repo):
     await m.reply("Hello, admin!")
     await user_start(m, repo)
 
 
+@admin_router.message(Command('send_message'))
 async def admin_send_messages(m: Message, state: FSMContext):
     await m.answer('что хотите отправить?')
     await state.set_state(AdminState.SEND_MESSAGE)
 
 
-async def admin_message(m: Message, repo: Repo, state: FSMContext):
+@admin_router.message(StateFilter(AdminState.SEND_MESSAGE))
+async def admin_message(m: Message, repo: Repo, state: FSMContext, bot: Bot):
     await m.answer('отправляю')
     for user_id in repo.user_ids():
         try:
-            await m.bot.send_message(user_id, m.text)
+            await bot.send_message(user_id, m.text)
         except Exception:
             exc_m = ''.join(traceback.format_exc())
             await m.answer(f'при отправке пользователю с id {user_id} произошло исключение {exc_m}')
 
-    await state.finish()
+    await state.clear()
     await m.answer('отправил')
 
 
+@admin_router.message(Command('users_count'))
 async def users_count(m: Message, repo: Repo):
     await m.answer(f'сейчас у меня {len(repo.list_users())} пользователей')
 
@@ -42,8 +51,5 @@ async def no_admin(m: Message):
 
 
 def register_admin(dp: Dispatcher):
-    dp.register_message_handler(admin_start, commands=["start"], state="*", role=UserRole.ADMIN)
-    dp.register_message_handler(admin_send_messages, commands="send_message", state=None, is_admin=True)
-    dp.register_message_handler(admin_message, state=AdminState.SEND_MESSAGE, is_admin=True)
-    dp.register_message_handler(users_count, commands='users_count', is_admin=True)
-    dp.register_message_handler(no_admin, commands=['send_message', 'users_count'], is_admin=False)
+    dp.message.register(no_admin, RoleFilter(UserRole.USER), Command('send_message', 'users_count'))
+    dp.include_router(admin_router)
