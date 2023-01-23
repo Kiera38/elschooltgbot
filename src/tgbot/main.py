@@ -6,7 +6,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from tgbot.config import load_config
 from tgbot.handlers import get_commands, register_handlers
-from tgbot.middlewares.data import DataMiddleware
+from tgbot.middlewares.data import RepoMiddleware
 from tgbot.middlewares.role import RoleMiddleware
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ async def run_bot():
     role_middleware = RoleMiddleware(config.tg_bot.admin_id)
     dp.message.outer_middleware(role_middleware)
     dp.errors.middleware(role_middleware)
-    dp.message.outer_middleware(DataMiddleware(config.data.users_pkl_file))
+    dp.message.outer_middleware(RepoMiddleware(config.data.users_pkl_file))
     register_handlers(dp)
 
     await set_bot_commands(bot)

@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from tgbot.filters.role import RoleFilter
-from tgbot.handlers.user import user_start
+from tgbot.handlers.user.commands import user_start
 from tgbot.models.user import UserRole
 from tgbot.services.repository import Repo
 from tgbot.states.user import AdminState
@@ -16,9 +16,9 @@ admin_router = Router()
 admin_router.message.filter(RoleFilter(UserRole.ADMIN))
 
 @admin_router.message(Command('start'))
-async def admin_start(m: Message, repo: Repo):
+async def admin_start(m: Message):
     await m.reply("Hello, admin!")
-    await user_start(m, repo)
+    await user_start(m)
 
 
 @admin_router.message(Command('send_message'))

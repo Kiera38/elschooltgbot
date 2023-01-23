@@ -1,18 +1,13 @@
-import inspect
-
-from aiogram import Dispatcher, Router
 from aiogram.filters import StateFilter, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from tgbot.filters.user import RegisteredUserFilter
+from tgbot.handlers.user import router, registered_router, grades_router
 from tgbot.handlers.utils import show_grades, lower_keys, show_grades_for_lesson, show_fix_grades
-from tgbot.models.user import User
 from tgbot.services.repository import Repo
 from tgbot.states.user import ParamsGetter
 
-
-user_router = Router()
 
 async def is_command(m: Message):
     if m.text in [
@@ -34,7 +29,7 @@ async def is_command(m: Message):
     return False
 
 
-@user_router.message(StateFilter(ParamsGetter.GET_LOGIN))
+@router.message(StateFilter(ParamsGetter.GET_LOGIN))
 async def get_user_login(m: Message, state: FSMContext):
     if await is_command(m):
         return
@@ -44,7 +39,7 @@ async def get_user_login(m: Message, state: FSMContext):
     await state.set_state(ParamsGetter.GET_PASSWORD)
 
 
-@user_router.message(StateFilter(ParamsGetter.GET_PASSWORD))
+@router.message(StateFilter(ParamsGetter.GET_PASSWORD))
 async def get_user_password(m: Message, repo: Repo, state: FSMContext):
     if await is_command(m):
         return
@@ -55,17 +50,10 @@ async def get_user_password(m: Message, repo: Repo, state: FSMContext):
     await m.answer('проверка введённых данных, попытка регистрации')
     await repo.register_user(m.from_user.id, data['login'], m.text)
     await m.answer('удалось зарегистрироваться, данные введены правильно')
-    if data:
-        partial_data = _check_spec(data['spec'], {'user': repo.get_user(m.from_user.id), 'repo': repo, 'state': state})
-        await data['command'](data['orig_msg'], **partial_data)
-        if data['finish_state']:
-            await state.clear()
-    else:
-        await state.clear()
 
 
-@user_router.message(StateFilter(ParamsGetter.GET_QUARTER))
-async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
+@router.message(StateFilter(ParamsGetter.GET_QUARTER))
+async def get_user_quarter(m: Message, repo: Repo):
     if await is_command(m):
         return
     if not m.text.isdigit():
@@ -75,119 +63,40 @@ async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
         user.quarter = int(m.text)
         await m.answer('сохранено')
         await m.delete()
-        data = await state.get_data()
-        if data:
-            if user.has_cashed_grades:
-                await m.answer('есть сохранённые оценки, использую их')
-            else:
-                await m.answer('оценки не сохранены, получаю новые оценки, пожалуйста подожди')
-            grades, time = await repo.get_grades(user)
-            grades = list(grades.values())[user.quarter-1]
-            if time:
-                await m.answer(f'оценки получены за {time:_.3f}')
-            partial_data = _check_spec(data['spec'], {'user': user, 'repo': repo, 'state': state, 'grades': grades})
-            await data['command'](data['orig_msg'], **partial_data)
-            if data['finish_state']:
-                await state.clear()
-        else:
-            await state.clear()
 
 
-@user_router.message(Command('start'))
-async def user_start(m: Message, repo: Repo):
+@router.message(Command('start'))
+async def user_start(m: Message):
     await m.reply("привет, я могу присылать тебе оценки из электронного журнала elschool и подсказывать как их испавить\n"
                   "чтобы узнать как пользоваться используй /help")
-    repo.add_user(m.from_user.id, User())
 
 
-def _check_spec(spec: inspect.FullArgSpec, kwargs: dict):
-    if spec.varkw:
-        return kwargs
-
-    return {k: v for k, v in kwargs.items() if k in set(spec.args + spec.kwonlyargs)}
-
-
-def register_needed(finish_state=False):
-    def force_registered(command):
-        spec = inspect.getfullargspec(command)
-        async def registered(message: Message, repo: Repo, state: FSMContext, **kwargs):
-            user = repo.get_user(message.from_user.id)
-            if user.jwtoken is not None:
-                partial_data = _check_spec(spec, {'user': user, 'repo': repo, 'state': state, **kwargs})
-                await command(message, **partial_data)
-                if finish_state:
-                    await state.clear()
-            else:
-                await message.answer('похоже, что ты ещё не пробовал получать оценки. '
-                                     'Сейчас нужно будет указать свои данные от elschool. '
-                                     'Так я смогу получить всю нужную информацию. Эти данные я не собираюсь сохранять.')
-                await message.answer('сейчас введи логин')
-                await state.set_state(ParamsGetter.GET_LOGIN)
-                await state.update_data(command=command, spec=spec, finish_state=finish_state, orig_msg=message)
-
-        return registered
-    return force_registered
-
-def grades_command(finish_state=False):
-    def force_quarter(command):
-        spec = inspect.getfullargspec(command)
-        @register_needed()
-        async def quarter(m: Message, repo: Repo, state: FSMContext, user: User = None, **kwargs):
-            if user is None:
-                user = repo.get_user(m.from_user.id)
-            if user.has_cashed_grades:
-                await m.answer('есть сохранённые оценки, использую их')
-            else:
-                await m.answer('оценки не сохранены, получаю новые оценки, пожалуйста подожди')
-            grades, time = await repo.get_grades(user)
-            if time:
-                await m.answer(f'оценки получены за {time:_.3f}')
-            if user.quarter:
-                grades = list(grades.values())[user.quarter - 1]
-                partial_data = _check_spec(spec, {'user': user, 'repo': repo, 'state': state, 'grades': grades,**kwargs})
-                await command(m, **partial_data)
-                if finish_state:
-                    await state.clear()
-            else:
-                await state.set_state(ParamsGetter.GET_QUARTER)
-                await state.update_data(command=command, spec=spec, finish_state=finish_state, orig_msg=m)
-                quarters = '\n'.join(list(grades.keys()))
-                await m.answer(f'какие оценки показать, нужно просто число, варианты:\n{quarters}')
-
-        return quarter
-    return force_quarter
-
-
-@user_router.message(Command('get_grades'))
-@grades_command(True)
+@grades_router.message(Command('get_grades'))
 async def get_grades(m: Message, grades):
     await m.answer(show_grades(grades))
 
-@user_router.message(Command('clear_cache'))
+
+@registered_router.message(Command('clear_cache'))
 async def clear_cache(m: Message, repo: Repo):
-    await m.answer('очищаю сохранённые оценки')
     user = repo.get_user(m.from_user.id)
     user.cached_grades = None
+    await m.answer('очистил сохранённые оценки')
 
 
-@user_router.message(Command('update_cache'))
-async def update_cache(m: Message, repo: Repo, state: FSMContext):
+@registered_router.message(Command('update_cache'))
+async def update_cache(m: Message, repo: Repo):
     await clear_cache(m, repo)
     await m.answer('обновляю сохранённые оценки')
-    await cache_updated(m, repo, state)
+    grades, time = await repo.get_grades(repo.get_user(m.from_user.id))
+    await m.answer(f'оценки обновлены за {time: _.3f} с')
 
 
-@grades_command(True)
-async def cache_updated(m: Message):
-    await m.answer('оценки обновлены')
 
-
-@user_router.message(Command('fix_grades'))
-@grades_command(True)
+@grades_router.message(Command('fix_grades'))
 async def fix_grades(m: Message, grades):
     await m.answer(show_fix_grades(grades))
 
-@user_router.message(Command('version'))
+@router.message(Command('version'))
 async def version(m: Message):
     await m.answer("""моя версия: 1.5.8
 список изменений:
@@ -206,7 +115,7 @@ async def version(m: Message):
 больше нельзя написать команду вместо чего-то, что просит бот""")
 
 
-@user_router.message(Command('new_version'))
+@router.message(Command('new_version'))
 async def new_version(m: Message):
     await m.answer("""В следующем обновлении:
     
@@ -223,7 +132,7 @@ async def new_version(m: Message):
 """)
 
 
-@user_router.message(Command('help'))
+@router.message(Command('help'))
 async def help(m: Message):
     await m.answer("""я могу присылать тебе оценки из электронного журнала elschool и подсказывать как их испавить
 
@@ -246,7 +155,7 @@ async def help(m: Message):
 Также, если просто написать название урока можно получить подробную информацию по каждой оценке""")
 
 
-@user_router.message(Command('change_quarter'))
+@registered_router.message(Command('change_quarter'))
 async def change_quarter(m: Message, repo: Repo, state: FSMContext):
     user = repo.get_user(m.from_user.id)
     await state.set_state(ParamsGetter.GET_QUARTER)
@@ -258,7 +167,7 @@ async def change_quarter(m: Message, repo: Repo, state: FSMContext):
         await m.answer('оценки не получены, вариантов нет, напиши просто число')
 
 
-@user_router.message(Command('privacy_policy'))
+@router.message(Command('privacy_policy'))
 async def privacy_policy(m: Message):
     await m.answer('это что-то похожее на политику конфиденциальности. '
                    'Если кто-то напишет нормальную политику конфиденциальности, я её обновлю.')
@@ -267,13 +176,13 @@ async def privacy_policy(m: Message):
                    "Этот токен используется для получения оценок. Никак ваши данные из него получить нельзя")
 
 
-@user_router.message(Command('reregister'))
+@registered_router.message(Command('reregister'))
 async def reregister(m: Message, state: FSMContext):
     await m.answer('сейчас можно изменить свой логин и пароль, сначала введи новый логин')
     await state.set_state(ParamsGetter.GET_LOGIN)
 
 
-@user_router.message(Command('unregister'))
+@registered_router.message(Command('unregister'))
 async def unregister(m: Message, repo: Repo):
     try:
         repo.remove_user(m.from_user.id)
@@ -283,13 +192,7 @@ async def unregister(m: Message, repo: Repo):
         await m.answer('я тебя удалил.')
 
 
-async def no_user(m: Message, repo: Repo):
-    await m.answer('тебя нет в списке пользователей, сейчас добавлю')
-    await user_start(m, repo)
-
-
-@user_router.message()
-@grades_command(True)
+@grades_router.message()
 async def grades_one_lesson(m: Message, grades):
     grades = lower_keys(grades)
     lesson = m.text.lower()
@@ -302,7 +205,6 @@ async def grades_one_lesson(m: Message, grades):
     await m.answer(show_grades_for_lesson(grades[lesson]))
 
 
-def register_user(dp: Dispatcher):
-    dp.include_router(user_router)
-    dp.message.register(no_user, RegisteredUserFilter(False))
-
+@router.message(RegisteredUserFilter(False))
+async def no_user(m: Message):
+    await m.answer('тебя нет в списке пользователей, сейчас добавлю, попробуй зарегистрироваться')

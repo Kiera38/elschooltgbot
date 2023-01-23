@@ -2,17 +2,22 @@ import typing
 from typing import Any, Union, Dict
 
 from aiogram.filters import BaseFilter
-from aiogram.types import Message
+from aiogram.types import Message, User
 from aiogram.types.base import TelegramObject
 
 from tgbot.models.user import UserRole
 
 
 class RoleFilter(BaseFilter):
-    async def __call__(self, message: Message, role: UserRole) -> Union[bool, Dict[str, Any]]:
+    async def __call__(self, message: Message, admin_id: int, event_from_user: User) -> Union[bool, Dict[str, Any]]:
         if self.roles is None:
             return True
-        return role in self.roles
+        if event_from_user.id == admin_id:
+            role = UserRole.ADMIN
+        else:
+            role = UserRole.USER
+        if role in self.roles:
+            return {'user_role': role}
 
     def __init__(
         self,

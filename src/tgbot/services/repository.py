@@ -14,10 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 class Repo:
-    def __init__(self, users, admin_id):
+    def __init__(self, users):
         self.users: Dict[int, User] = users
         self.elschool_repo = ElschoolRepo()
-        self._admin_id = admin_id
 
     def add_user(self, user_id, user: User) -> None:
         self.users[user_id] = user
@@ -29,9 +28,6 @@ class Repo:
 
     def user_ids(self):
         return list(self.users.keys())
-
-    def get_admin_user(self):
-        return self.get_user(self._admin_id)
 
     def get_user(self, user_id):
         return self.users.get(user_id)

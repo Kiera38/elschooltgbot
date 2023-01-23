@@ -13,4 +13,3 @@ class RegisteredUserFilter(BaseFilter):
     def __init__(self, is_user: bool):
         self.is_user = is_user
 
-
