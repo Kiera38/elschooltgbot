@@ -6,7 +6,8 @@ from tgbot.handlers import user, admin, errors
 
 
 def get_commands():
-    return [BotCommand(command="/get_grades", description="получить оценки"),
+    return [BotCommand(command='/register', description=''),
+            BotCommand(command="/get_grades", description="получить оценки"),
             BotCommand(command="/fix_grades", description="исправить все оценки"),
             BotCommand(command='/start', description='запустить бота и добавить в список пользователей'),
             BotCommand(command='/help', description='как пользоваться ботом'),

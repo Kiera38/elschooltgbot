@@ -35,24 +35,27 @@ class Repo:
     def remove_user(self, user_id):
         del self.users[user_id]
 
-    async def register_user(self, user_id, login, password):
-        user = self.get_user(user_id)
-        user.jwtoken = await self.elschool_repo.register(login, password)
+    async def register_user(self, login, password):
+        return await self.elschool_repo.register(login, password)
+
+    async def get_grades_userdata(self, jwtoken, url=None):
+        start = time.time()
+        logger.info('получаем новые оценки')
+        if url:
+            grades = await self.elschool_repo.get_grades(jwtoken, url)
+        else:
+            grades, url = await self.elschool_repo.get_grades_and_url(jwtoken)
+        end = time.time()
+        logger.info(f'получены новые оценки за {end - start}')
+        return grades, end - start, url
 
     async def get_grades(self, user):
         if user.has_cashed_grades:
             logger.info('используются кешированные оценки')
             return user.cached_grades, 0
-        start = time.time()
-        logger.info('получаем новые оценки')
-        if user.url:
-            grades = await self.elschool_repo.get_grades(user.jwtoken, user.url)
-        else:
-            grades, user.url = await self.elschool_repo.get_grades_and_url(user.jwtoken)
+        grades, time, user.url = self.get_grades_userdata(user.jwtoken, user.url)
         user.update_cache(grades)
-        end = time.time()
-        logger.info(f'получены новые оценки за {end-start}')
-        return grades, end - start
+        return grades, time
 
     def has_user(self, user_id):
         return user_id in self.users

@@ -1,3 +1,5 @@
+from typing import cast
+
 from aiogram.filters import StateFilter, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
@@ -5,6 +7,7 @@ from aiogram.types import Message
 from tgbot.filters.user import RegisteredUserFilter
 from tgbot.handlers.user import router, registered_router, grades_router
 from tgbot.handlers.utils import show_grades, lower_keys, show_grades_for_lesson, show_fix_grades
+from tgbot.models.user import User
 from tgbot.services.repository import Repo
 from tgbot.states.user import ParamsGetter
 
@@ -35,7 +38,7 @@ async def get_user_login(m: Message, state: FSMContext):
         return
     await state.update_data(login=m.text)
     await m.delete()
-    await m.answer('логин сохранён, теперь напиши пароль')
+    await m.answer('логин получил, теперь напиши пароль')
     await state.set_state(ParamsGetter.GET_PASSWORD)
 
 
@@ -45,24 +48,48 @@ async def get_user_password(m: Message, repo: Repo, state: FSMContext):
         return
 
     await m.delete()
-    await m.answer('пароль сохранён')
     data = await state.get_data()
     await m.answer('проверка введённых данных, попытка регистрации')
-    await repo.register_user(m.from_user.id, data['login'], m.text)
-    await m.answer('удалось зарегистрироваться, данные введены правильно')
+    jwtoken = await repo.register_user(data['login'], m.text)
+    await state.update_data(jwtoken=jwtoken)
+    await m.answer('удалось зарегистрироваться, данные введены правильно, теперь попробую получить оценки')
+    grades, time, url = await repo.get_grades_userdata(jwtoken)
+    quarters = '\n'.join([f'{i}). {quarter}' for i, quarter in enumerate(grades, 1)])
+    await state.update_data(url=url, quarters=list(grades.keys()))
+    await state.set_state(ParamsGetter.GET_QUARTER)
+    await m.answer(f'оценки получиз за {time:.3f}с. Выбери какие оценки мне нужно показывать, варианты\n{quarters}')
+
 
 
 @router.message(StateFilter(ParamsGetter.GET_QUARTER))
-async def get_user_quarter(m: Message, repo: Repo):
+async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
     if await is_command(m):
         return
+    data = await state.get_data()
     if not m.text.isdigit():
-        await m.answer(f'должно быть число, например 1, не {m.text}')
+        if m.text in data['quarters']:
+            quarter = cast(list, data['quarters']).index(m.text) + 1
+        else:
+            quarters = '\n'.join([f'{i}). {quarter}' for i, quarter in enumerate(data['quarters'], 1)])
+            await m.answer(f'тут немного не правильно написано, попробуй ещё раз, варианты:\n{quarters}')
+            return
     else:
-        user = repo.get_user(m.from_user.id)
-        user.quarter = int(m.text)
-        await m.answer('сохранено')
-        await m.delete()
+        quarter = int(m.text)
+        if quarter > len(data['quarters']):
+            quarters = '\n'.join([f'{i}). {quarter}' for i, quarter in enumerate(data['quarters'], 1)])
+            await m.answer(f'тут немного не правильно написано, попробуй ещё раз, варианты:\n{quarters}')
+            return
+    repo.add_user(m.from_user.id, User(data['jwtoken'], quarter, url=data['url']))
+    await m.answer('регистрация завершена, теперь можешь получать оценки')
+    await m.delete()
+    await state.clear()
+
+
+@router.message(Command('register'))
+async def register(m: Message, state: FSMContext):
+    await state.set_state(ParamsGetter.GET_LOGIN)
+    await m.answer('сейчас нужно ввести свои данные, сначала логин')
+
 
 
 @router.message(Command('start'))
