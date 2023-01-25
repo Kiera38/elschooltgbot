@@ -13,7 +13,13 @@ class GradesMiddleware(BaseMiddleware):
         user: types.User = data['event_from_user']
         repo: Repo = data['repo']
         bot_user = repo.get_user(user.id)
-        grades, time = await repo.get_grades(bot_user.id)
-        await cast(Message, event).answer(f'оценки получены за {time:.3f} с')
-        data['grades'] = grades.values()[bot_user.quarter-1]
+        message = cast(Message, event)
+        if bot_user.has_cashed_grades:
+            await message.answer('есть сохранённые оценки, показываю их')
+        else:
+            await message.answer('нет сохранённых оценок, сейчас получу новые, придётся подождать')
+        grades, time = await repo.get_grades(bot_user)
+        if time:
+            await message.answer(f'оценки получены за {time:.3f} с')
+        data['grades'] = list(grades.values())[bot_user.quarter-1]
         return await handler(event, data)

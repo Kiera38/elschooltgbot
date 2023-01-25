@@ -49,10 +49,10 @@ def show_grades_for_lesson(grades):
     for grade in grades:
         gr = grade['grade']
         date = '\n'.join(grade['date'])
-        text.append(html.text(html.text(html.underline('оценка'), gr), date, sep='\n'))
+        text.append(fmt.text(fmt.text(html.underline('оценка'), gr), date, sep='\n'))
     grades_list = [grade['grade'] for grade in grades]
     round_grade = get_mean_gr(grades_list)
-    text.append(html.text(html.italic('средняя'), round_grade))
+    text.append(fmt.text(html.italic('средняя'), round_grade))
     if round_grade < 3.5:
         text.append(show_fix_to4(grades_list))
     if round_grade < 4.5:
@@ -66,7 +66,7 @@ def show_fix_to5(grades_list):
 
 
 def show_fix_to4(grades_list):
-    tooltips = ' или '.join([html.text(*var, sep=', ') for var in fix_to4(grades_list)])
+    tooltips = ' или '.join([fmt.text(*var, sep=', ') for var in fix_to4(grades_list)])
     return fmt.text('для', html.italic('исправления оценки до 4'), 'можно получить', tooltips)
 
 

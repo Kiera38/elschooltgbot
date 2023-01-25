@@ -9,7 +9,7 @@ from tgbot.handlers.user import router, registered_router, grades_router
 from tgbot.handlers.utils import show_grades, lower_keys, show_grades_for_lesson, show_fix_grades
 from tgbot.models.user import User
 from tgbot.services.repository import Repo
-from tgbot.states.user import ParamsGetter
+from tgbot.states.user import ParamsGetter, Change
 
 
 async def is_command(m: Message):
@@ -182,16 +182,42 @@ async def help(m: Message):
 Также, если просто написать название урока можно получить подробную информацию по каждой оценке""")
 
 
+@registered_router.message(StateFilter(Change.QUARTER))
+async def quarter_changed(m: Message, state: FSMContext, repo: Repo):
+    if await is_command(m):
+        return
+    user = repo.get_user(m.from_user.id)
+    quarters = list(user.cached_grades)
+    if not m.text.isdigit():
+        if m.text in quarters:
+            quarter = cast(list, quarters).index(m.text) + 1
+        else:
+            quarters = '\n'.join([f'{i}). {quarter}' for i, quarter in enumerate(quarters, 1)])
+            await m.answer(f'тут немного не правильно написано, попробуй ещё раз, варианты:\n{quarters}')
+            return
+    else:
+        quarter = int(m.text)
+        if quarter > len(quarters):
+            quarters = '\n'.join([f'{i}). {quarter}' for i, quarter in enumerate(quarters, 1)])
+            await m.answer(f'тут немного не правильно написано, попробуй ещё раз, варианты:\n{quarters}')
+            return
+    user.quarter = quarter
+    await state.clear()
+    await m.answer('изменил')
+
+
 @registered_router.message(Command('change_quarter'))
 async def change_quarter(m: Message, repo: Repo, state: FSMContext):
     user = repo.get_user(m.from_user.id)
-    await state.set_state(ParamsGetter.GET_QUARTER)
+    await state.set_state(Change.QUARTER)
     if user.cached_grades:
         grades = user.cached_grades
-        quarters = '\n'.join([f'{i}). {quarter}' for i, quarter in enumerate(grades, 1)])
-        await m.answer(f'выбери вариант, укажи просто число, варианты \n{quarters}')
     else:
-        await m.answer('оценки не получены, вариантов нет, напиши просто число')
+        await m.answer('нет сохранённых, оценок. Чтобы узнать какие есть варианты, сейчас получу оценки')
+        grades, time = await repo.get_grades(user)
+        await m.answer(f'оценки получил за {time:.3f}с')
+    quarters = '\n'.join([f'{i}). {quarter}' for i, quarter in enumerate(grades, 1)])
+    await m.answer(f'выбери вариант, укажи просто число, варианты \n{quarters}')
 
 
 @router.message(Command('privacy_policy'))
@@ -206,7 +232,32 @@ async def privacy_policy(m: Message):
 @registered_router.message(Command('reregister'))
 async def reregister(m: Message, state: FSMContext):
     await m.answer('сейчас можно изменить свой логин и пароль, сначала введи новый логин')
-    await state.set_state(ParamsGetter.GET_LOGIN)
+    await state.set_state(Change.LOGIN)
+
+
+@registered_router.message(StateFilter(Change.LOGIN))
+async def change_login(m: Message, state: FSMContext):
+    if await is_command(m):
+        return
+    await state.update_data(login=m.text)
+    await state.set_state(Change.PASSWORD)
+    await m.answer('хорошо, теперь напиши пароль')
+
+
+@registered_router.message(StateFilter(Change.PASSWORD))
+async def change_password(m: Message, state: FSMContext, repo: Repo):
+    if await is_command(m):
+        return
+    data = await state.get_data()
+    login = data['login']
+    password = m.text
+    await m.answer('проверка введённых данных, попытка регистрации')
+    jwtoken = await repo.register_user(login, password)
+    user = repo.get_user(m.from_user.id)
+    user.jwtoken = jwtoken
+    user.cached_grades = None
+    await state.clear()
+    await m.answer('удалось зарегистрироваться, данные введены правильно')
 
 
 @registered_router.message(Command('unregister'))

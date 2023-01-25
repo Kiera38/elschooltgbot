@@ -53,7 +53,7 @@ class Repo:
         if user.has_cashed_grades:
             logger.info('используются кешированные оценки')
             return user.cached_grades, 0
-        grades, time, user.url = self.get_grades_userdata(user.jwtoken, user.url)
+        grades, time, user.url = await self.get_grades_userdata(user.jwtoken, user.url)
         user.update_cache(grades)
         return grades, time
 
