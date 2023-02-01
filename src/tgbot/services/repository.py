@@ -20,7 +20,7 @@ class Repo:
 
     def add_user(self, user_id, user: User) -> None:
         self.users[user_id] = user
-        logger.info('пользователь добавлен')
+        logger.info(f'пользователь добавлен {user}')
 
     def list_users(self) -> List[User]:
         """List all bot users"""
@@ -50,7 +50,7 @@ class Repo:
         return grades, end - start, url
 
     async def get_grades(self, user):
-        if user.has_cashed_grades:
+        if user.has_cached_grades:
             logger.info('используются кешированные оценки')
             return user.cached_grades, 0
         grades, time, user.url = await self.get_grades_userdata(user.jwtoken, user.url)
@@ -145,7 +145,7 @@ class NotRegisteredException(Exception):
     def __init__(self, *args, login=None, password=None):
         super().__init__(*args)
         self.login = login
-        self.password=password
+        self.password = password
 
 class NoDataException(Exception):
     pass

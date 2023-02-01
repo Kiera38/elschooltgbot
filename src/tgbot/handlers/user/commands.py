@@ -1,12 +1,12 @@
-from typing import cast
-
 from aiogram.filters import StateFilter, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from tgbot.filters.user import RegisteredUserFilter
-from tgbot.handlers.user import router, registered_router, grades_router
-from tgbot.handlers.utils import show_grades, lower_keys, show_grades_for_lesson, show_fix_grades
+from tgbot.handlers.user import router, registered_router, grades_router, functions
+from tgbot.handlers.user.functions import show_all_grades, show_get_grades, show_all_get_fix_grades, register_user, \
+    change_data, show_version, remove_data, show_privacy_policy
+from tgbot.keyboards.user import main_keyboard, row_list_keyboard
 from tgbot.models.user import User
 from tgbot.services.repository import Repo
 from tgbot.states.user import ParamsGetter, Change
@@ -54,10 +54,10 @@ async def get_user_password(m: Message, repo: Repo, state: FSMContext):
     await state.update_data(jwtoken=jwtoken)
     await m.answer('удалось зарегистрироваться, данные введены правильно, теперь попробую получить оценки')
     grades, time, url = await repo.get_grades_userdata(jwtoken)
-    quarters = '\n'.join([f'{i}). {quarter}' for i, quarter in enumerate(grades, 1)])
+    quarters = list(grades)
     await state.update_data(url=url, quarters=list(grades.keys()))
     await state.set_state(ParamsGetter.GET_QUARTER)
-    await m.answer(f'оценки получиз за {time:.3f}с. Выбери какие оценки мне нужно показывать, варианты\n{quarters}')
+    await m.answer(f'оценки получил за {time:.3f}с. Выбери какие оценки мне нужно показывать', reply_markup=row_list_keyboard(quarters))
 
 
 
@@ -68,39 +68,38 @@ async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
     data = await state.get_data()
     if not m.text.isdigit():
         if m.text in data['quarters']:
-            quarter = cast(list, data['quarters']).index(m.text) + 1
+            quarter = m.text
         else:
-            quarters = '\n'.join([f'{i}). {quarter}' for i, quarter in enumerate(data['quarters'], 1)])
-            await m.answer(f'тут немного не правильно написано, попробуй ещё раз, варианты:\n{quarters}')
+            quarters = list(data['quarters'].keys())
+            await m.answer(f'тут немного не правильно написано, попробуй ещё раз', reply_markup=row_list_keyboard(quarters))
             return
     else:
         quarter = int(m.text)
-        if quarter > len(data['quarters']):
-            quarters = '\n'.join([f'{i}). {quarter}' for i, quarter in enumerate(data['quarters'], 1)])
-            await m.answer(f'тут немного не правильно написано, попробуй ещё раз, варианты:\n{quarters}')
+        quarters = list(data['quarters'])
+        if quarter > len(quarters):
+            await m.answer(f'тут немного не правильно написано, попробуй ещё раз',reply_markup=row_list_keyboard(quarters))
             return
+        quarter = quarters[quarter - 1]
     repo.add_user(m.from_user.id, User(data['jwtoken'], quarter, url=data['url']))
-    await m.answer('регистрация завершена, теперь можешь получать оценки')
+    await m.answer('регистрация завершена, теперь можешь получать оценки', reply_markup=main_keyboard())
     await m.delete()
     await state.clear()
 
 
 @router.message(Command('register'))
 async def register(m: Message, state: FSMContext):
-    await state.set_state(ParamsGetter.GET_LOGIN)
-    await m.answer('сейчас нужно ввести свои данные, сначала логин')
-
+    await register_user(m, state)
 
 
 @router.message(Command('start'))
 async def user_start(m: Message):
     await m.reply("привет, я могу присылать тебе оценки из электронного журнала elschool и подсказывать как их испавить\n"
-                  "чтобы узнать как пользоваться используй /help")
+                  "чтобы узнать как пользоваться используй /help", reply_markup=main_keyboard())
 
 
 @grades_router.message(Command('get_grades'))
 async def get_grades(m: Message, grades):
-    await m.answer(show_grades(grades))
+    await show_all_grades(m, grades)
 
 
 @registered_router.message(Command('clear_cache'))
@@ -118,28 +117,13 @@ async def update_cache(m: Message, repo: Repo):
     await m.answer(f'оценки обновлены за {time: _.3f} с')
 
 
-
 @grades_router.message(Command('fix_grades'))
 async def fix_grades(m: Message, grades):
-    await m.answer(show_fix_grades(grades))
+    await show_all_get_fix_grades(m, grades)
 
 @router.message(Command('version'))
 async def version(m: Message):
-    await m.answer("""моя версия: 1.5.8
-список изменений:
-улучшена обработка ошибок
-
-Новая система ввода данных о пользователе:
-При старте бот больше не просит данные, они будут запрошены при первом получении оценок. После этого данные хранятся только в оперативной памяти. Поэтому доступа у разработчика к ним нет. Но из-за этого при перезагрузке бота эти данные потеряются. Чтобы не потерять эти данные, можно сохранить на диске с помощью /save_params.
-
-Появилась политика конфиденциальности. Чтобы её посмотреть, используйте /privacy_policy. 
-Добавлено форматирование сообщений. 
-добавлена команда /fix_grades в список команд telegram. Сама команда существовала давно, но в этом списке её не было
-Улучшена команда /help в соответствии с обновлением
-Добавлена команда /cancel. Она нужна чтобы сбросить текущее состояние
-Команда админа бота /send_message теперь отправляет всем пользователям одновременно. Раньше она это делала по очереди. Она всё таки отправляет по очереди из-за ограничений telegram.  
-Команды для разработчика добавлены в список команд. Но вы все равно не сможете ими воспользоваться. В /help их нет, только в списке команд
-больше нельзя написать команду вместо чего-то, что просит бот""")
+    await show_version(m)
 
 
 @router.message(Command('new_version'))
@@ -148,12 +132,15 @@ async def new_version(m: Message):
     
 сделано:
 Нормальная регистрация (разобрался, как можно сделать)
+Переход на aiogram 3.x (крупные компании обычно не меняют версии, но мне можно)
+Изменения в регистрации (знаю, написал во второй раз, но код мне пришлось тоже 2 раза писать)
+Теперь перед получением оценок нужно один раз использовать /register для получения токена. С помощью этого токена бот получает оценки. Раньше использовал логин и пароль. Теперь логин и пароль используется только для получения токена.
+Увеличение скорости получения оценок из-за изменившейся регистрации
 
 сейчас делаю:
-переход на aiogram 3.x
+Взаимодействие с ботом через кнопки (через команды также можно)
 
 будет сделано: 
-Взаимодействие с ботом через кнопки (через команды также можно)
 Некоторые мелкие изменения
 Возможно база данных вместо обычного файла для хранения данных пользователей (в одном из обновлений это произойдёт, возможно в этом)
 """)
@@ -164,6 +151,7 @@ async def help(m: Message):
     await m.answer("""я могу присылать тебе оценки из электронного журнала elschool и подсказывать как их испавить
 
 команды:
+/register - указать данные для получения оценок
 /get_grades - получить все оценки
 /fix_grades - получить все оценки и как можно их исправить
 /help - показать это сообщение
@@ -173,11 +161,11 @@ async def help(m: Message):
 /cancel - сбросить текущее состояние
 /clear_cache - удалить сохранённые оценки.
 /update_cache - обновить сохранённые оценки. Для скорости и некоторых других функций оценки хранятся в течение 1 часа, если по какой-то причине нужно их обновить можно использовать эту команду
-/change_quarter - изменить четверть (полугодие)
+/change_quarter - изменить четверть (полугодие, ну или как ещё можно назвать)
 /reregister - изменить данные 
-/unregister - удалить все данные
+/unregister - удалить данные
 
-Команды, которые получают оценки могут потребовать логин и пароль. Доступа к этим данным у разработчика нет. Всё это описано в политике конфиденциальности. 
+Для получения оценок нужно обязательно указать свои данные с помощью /register или с помощью пункта в меню регистрация. Потребуется логин и пароль. Доступа к этим данным у разработчика нет. Всё это описано в политике конфиденциальности. 
 
 Также, если просто написать название урока можно получить подробную информацию по каждой оценке""")
 
@@ -187,52 +175,40 @@ async def quarter_changed(m: Message, state: FSMContext, repo: Repo):
     if await is_command(m):
         return
     user = repo.get_user(m.from_user.id)
-    quarters = list(user.cached_grades)
+    quarters = user.cached_grades
     if not m.text.isdigit():
         if m.text in quarters:
-            quarter = cast(list, quarters).index(m.text) + 1
+            quarter = m.text
         else:
-            quarters = '\n'.join([f'{i}). {quarter}' for i, quarter in enumerate(quarters, 1)])
-            await m.answer(f'тут немного не правильно написано, попробуй ещё раз, варианты:\n{quarters}')
+            quarters = list(quarters.keys())
+            await m.answer(f'тут немного не правильно написано, попробуй ещё раз', reply_markup=row_list_keyboard(quarters))
             return
     else:
         quarter = int(m.text)
+        quarters = list(quarters)
         if quarter > len(quarters):
-            quarters = '\n'.join([f'{i}). {quarter}' for i, quarter in enumerate(quarters, 1)])
-            await m.answer(f'тут немного не правильно написано, попробуй ещё раз, варианты:\n{quarters}')
+            await m.answer(f'тут немного не правильно написано, попробуй ещё раз', reply_markup=row_list_keyboard(quarters))
             return
+        quarter = quarters[quarter-1]
     user.quarter = quarter
     await state.clear()
-    await m.answer('изменил')
+    await m.answer('изменил', reply_markup=main_keyboard())
 
 
 @registered_router.message(Command('change_quarter'))
 async def change_quarter(m: Message, repo: Repo, state: FSMContext):
     user = repo.get_user(m.from_user.id)
-    await state.set_state(Change.QUARTER)
-    if user.cached_grades:
-        grades = user.cached_grades
-    else:
-        await m.answer('нет сохранённых, оценок. Чтобы узнать какие есть варианты, сейчас получу оценки')
-        grades, time = await repo.get_grades(user)
-        await m.answer(f'оценки получил за {time:.3f}с')
-    quarters = '\n'.join([f'{i}). {quarter}' for i, quarter in enumerate(grades, 1)])
-    await m.answer(f'выбери вариант, укажи просто число, варианты \n{quarters}')
+    await functions.change_quarter(m, user, state, repo)
 
 
 @router.message(Command('privacy_policy'))
 async def privacy_policy(m: Message):
-    await m.answer('это что-то похожее на политику конфиденциальности. '
-                   'Если кто-то напишет нормальную политику конфиденциальности, я её обновлю.')
-    await m.answer("Для получения оценок бот просит логин и пароль от журнала elschool. "
-                   "Эти данные используются только для получения токена. "
-                   "Этот токен используется для получения оценок. Никак ваши данные из него получить нельзя")
+    await show_privacy_policy(m)
 
 
 @registered_router.message(Command('reregister'))
 async def reregister(m: Message, state: FSMContext):
-    await m.answer('сейчас можно изменить свой логин и пароль, сначала введи новый логин')
-    await state.set_state(Change.LOGIN)
+    await change_data(m, state)
 
 
 @registered_router.message(StateFilter(Change.LOGIN))
@@ -262,27 +238,14 @@ async def change_password(m: Message, state: FSMContext, repo: Repo):
 
 @registered_router.message(Command('unregister'))
 async def unregister(m: Message, repo: Repo):
-    try:
-        repo.remove_user(m.from_user.id)
-    except KeyError:
-        await m.answer('ээээ. Ты куда собрался. Тебя нет в моём списке')
-    else:
-        await m.answer('я тебя удалил.')
+    await remove_data(m, repo)
 
 
 @grades_router.message()
 async def grades_one_lesson(m: Message, grades):
-    grades = lower_keys(grades)
-    lesson = m.text.lower()
-    if lesson not in grades:
-        await m.answer(f'кажется, тебе хотелось не этого получить. '
-                       f'Если что, мне показалось, что ты хочешь получить оценки для {lesson}. '
-                       f'Такого названия урока нет. Если хотел сделать что-то другое можешь обратится к моему разработчику.'
-                       f'Он может добавить нужную функцию.')
-        return
-    await m.answer(show_grades_for_lesson(grades[lesson]))
+    await show_get_grades(m, grades)
 
 
 @router.message(RegisteredUserFilter(False))
 async def no_user(m: Message):
-    await m.answer('тебя нет в списке пользователей, сейчас добавлю, попробуй зарегистрироваться')
+    await m.answer('тебя нет в списке пользователей, попробуй зарегистрироваться')

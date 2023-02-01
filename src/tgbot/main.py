@@ -33,7 +33,9 @@ async def run_bot():
     role_middleware = RoleMiddleware(config.tg_bot.admin_id)
     dp.message.outer_middleware(role_middleware)
     dp.errors.middleware(role_middleware)
-    dp.message.outer_middleware(RepoMiddleware(config.data.users_pkl_file))
+    repo_middleware = RepoMiddleware(config.data.users_pkl_file)
+    dp.message.outer_middleware(repo_middleware)
+    dp.callback_query.outer_middleware(repo_middleware)
     register_handlers(dp)
 
     await set_bot_commands(bot)

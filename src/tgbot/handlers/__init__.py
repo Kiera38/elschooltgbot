@@ -1,8 +1,9 @@
 from aiogram import Dispatcher
-from aiogram.filters import Command, StateFilter
+from aiogram.filters import Command, StateFilter, Text
 from aiogram.fsm.context import FSMContext
-from aiogram.types import BotCommand, Message
+from aiogram.types import BotCommand, Message, CallbackQuery
 from tgbot.handlers import user, admin, errors
+from tgbot.keyboards.user import main_keyboard
 
 
 def get_commands():
@@ -13,7 +14,7 @@ def get_commands():
             BotCommand(command='/help', description='как пользоваться ботом'),
             BotCommand(command='/version', description='моя версия и список изменений'),
             BotCommand(command='/new_version', description='список изменений в будущей версии'),
-            BotCommand(command='/change_quarter', description='изменить четверть'),
+            BotCommand(command='/change_quarter', description='изменить четверть (полугодие)'),
             BotCommand(command="/reregister", description='изменить свои данные'),
             BotCommand(command='/unregister', description='удалить все данные'),
             BotCommand(command='/cancel', description='сбросить текущее состояние'),
@@ -21,17 +22,18 @@ def get_commands():
             BotCommand(command='/clear_cache', description='очистить сохранённые оценки')]
 
 
-async def admin_scope(m: Message):
-    await m.answer('это не команда! Только разделитель. Команды под этим разделителем тебе не доступны')
-
-
 async def cancel(m: Message, state: FSMContext):
     await state.clear()
-    await m.answer('текущее состояние сброшено')
+    await m.answer('текущее состояние сброшено', reply_markup=main_keyboard())
+
+
+async def cancel_query(query: CallbackQuery, state: FSMContext):
+    await cancel(query.message, state)
+    await query.answer()
 
 def register_handlers(dp: Dispatcher):
     dp.message.register(cancel, Command('cancel'), StateFilter('*'))
-    dp.message.register(admin_scope, Command('admin_scope'))
+    dp.callback_query.register(cancel_query, Text('cancel'))
     admin.register_admin(dp)
     user.register_user(dp)
     errors.register_errors(dp)

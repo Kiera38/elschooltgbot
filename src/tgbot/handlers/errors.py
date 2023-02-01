@@ -57,7 +57,8 @@ async def error_handler(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMCo
     else:
         errtrace = html.code(fmt.text(*errtrace))
         await bot.send_message(admin_id, f'произошла ошибка у пользователя {username}\n{errtrace}')
-    await handlers.cancel(error.update.message, state)
+
+    await handlers.cancel(error.update.message or error.update.callback_query.message, state)
 
 
 def register_errors(dp: Dispatcher):

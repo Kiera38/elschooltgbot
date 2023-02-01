@@ -1,6 +1,7 @@
 import time
 from dataclasses import dataclass
 from enum import Enum
+from typing import Union
 
 
 class UserRole(Enum):
@@ -11,14 +12,14 @@ class UserRole(Enum):
 @dataclass
 class User:
     jwtoken: str = None
-    quarter: int = None
+    quarter: Union[str, int] = None
     role: UserRole = UserRole.USER
     url: str = None
     cached_grades: dict = None
     last_cache: float = 0
 
     @property
-    def has_cashed_grades(self):
+    def has_cached_grades(self):
         return self.cached_grades is not None and time.time() - self.last_cache < 3600
 
     def update_cache(self, grades):

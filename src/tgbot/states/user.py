@@ -1,12 +1,6 @@
 from aiogram.fsm.state import StatesGroup, State
 
 
-class UserRegister(StatesGroup):
-    REGISTER_LOGIN = State()
-    REGISTER_PASSWORD = State()
-    SETUP_QUARTER = State()
-
-
 class ParamsGetter(StatesGroup):
     GET_LOGIN = State()
     GET_PASSWORD = State()
@@ -17,6 +11,13 @@ class Change(StatesGroup):
     LOGIN = State()
     PASSWORD = State()
     QUARTER = State()
+
+
+class Page(StatesGroup):
+    GRADES = State()
+    GET_GRADES = State()
+    FIX_GRADES = State()
+    REGISTER = State()
 
 
 class AdminState(StatesGroup):
