@@ -27,7 +27,6 @@ def show_grades(grades):
     if floor_grades[3]:
         lessons = ', '.join(floor_grades[3])
         text.append(fmt.text(html.bold('3 выходит по урокам'), lessons))
-    text.append('чтобы узнать, как исправить оценки можешь использовать /fix_grades')
     return '\n'.join(text)
 
 
@@ -37,7 +36,7 @@ def show_grade(name, grade):
         return fmt.text(html.underline(name), html.bold('нет оценок')), 0
     else:
         floor_gr = get_mean_gr([gra['grade'] for gra in grade])
-        return fmt.text(html.underline(name), gr, html.italic('средняя'), f'{floor_gr:_.3f}'), floor_gr
+        return fmt.text(html.underline(name), gr, html.italic('средняя'), f'{floor_gr:.2f}'), floor_gr
 
 
 def lower_keys(grades):
@@ -52,7 +51,7 @@ def show_grades_for_lesson(grades):
         text.append(fmt.text(fmt.text(html.underline('оценка'), gr), date, sep='\n'))
     grades_list = [grade['grade'] for grade in grades]
     round_grade = get_mean_gr(grades_list)
-    text.append(fmt.text(html.italic('средняя'), round_grade))
+    text.append(fmt.text(html.italic('средняя'), f'{round_grade:.2f}'))
     if round_grade < 3.5:
         text.append(show_fix_to4(grades_list))
     if round_grade < 4.5:
