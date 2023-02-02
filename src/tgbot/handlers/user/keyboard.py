@@ -84,8 +84,9 @@ async def back_grades(query: CallbackQuery, state: FSMContext):
     await state.set_state(Page.GRADES)
     await query.message.edit_reply_markup(grades_keyboard(True))
     data = await state.get_data()
-    message: Message = data['grades_message']
-    await message.delete()
+    message: Message = data.get('grades_message')
+    if message:
+        await message.delete()
     await query.answer()
 
 
