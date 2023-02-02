@@ -66,7 +66,7 @@ async def remove_data(m: Message, repo: Repo):
 
 
 async def show_version(m: Message):
-    await m.answer("""моя версия: 2.5.2 (3 обновление)
+    await m.answer("""моя версия: 2.5.7 (3 обновление)
 список изменений:
 Нормальная регистрация
 Переход на aiogram 3.x 

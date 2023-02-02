@@ -128,7 +128,7 @@ async def version(m: Message):
 
 @router.message(Command('version_comments'))
 async def version_comments(m: Message):
-    await m.answer("""моя версия: 2.5.2 (3 обновление)
+    await m.answer("""моя версия: 2.5.7 (3 обновление)
 список изменений:
 Нормальная регистрация (разобрался, как можно сделать)
 Переход на aiogram 3.x (крупные компании обычно не меняют версии, но мне можно)
