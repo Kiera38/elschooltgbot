@@ -20,24 +20,27 @@ error_router = Router()
 @error_router.errors(ExceptionTypeFilter(NotRegisteredException))
 async def not_registered_handler(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMContext):
     exception = cast(NotRegisteredException, error.exception)
-    await error.update.message.answer(f"произошла ошибка регистрации: {error.exception}")
+    message = error.update.message or error.update.callback_query.message
+    await message.answer(f"произошла ошибка регистрации: {error.exception}")
     if exception.login is not None and exception.password is not None:
-        await error.update.message.answer(fmt.text('твой логин', html.spoiler(exception.login),
-                                                   'и твой пароль', html.spoiler(exception.password)))
+        await message.answer(fmt.text('твой логин', html.spoiler(exception.login),
+                                      'и твой пароль', html.spoiler(exception.password)))
 
     await error_handler(error, admin_id, bot, state)
 
 @error_router.errors(ExceptionTypeFilter(NoDataException))
 async def no_data(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMContext):
-    await error.update.message.answer(f'произошла ошибка при получении оценок: {error.exception}')
+    message = error.update.message or error.update.callback_query.message
+    await message.answer(f'произошла ошибка при получении оценок: {error.exception}')
     await error_handler(error, admin_id, bot, state)
 
 
 @error_router.errors(ExceptionTypeFilter(TimeoutError))
 async def timeout(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMContext):
-    await error.update.message.answer('Действие выполнялось слишком долго, из-за этого произошла ошибка.'
-                                      'Возможно, это могло произойти из-за плохого подключения к серверу elschool.'
-                                      'Как вариант стоит попробовать сделать это действие немного позже')
+    message = error.update.message or error.update.callback_query.message
+    await message.answer('Действие выполнялось слишком долго, из-за этого произошла ошибка.'
+                         'Возможно, это могло произойти из-за плохого подключения к серверу elschool.'
+                         'Как вариант стоит попробовать сделать это действие немного позже')
     await error_handler(error, admin_id, bot, state)
 
 
@@ -57,7 +60,8 @@ async def error_handler(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMCo
             err_msg = ''.join(errtrace[mindex*15:mindex*15+15])
         else:
             err_msg = ''.join(errtrace[mindex*15:])
-        await bot.send_message(admin_id, err_msg)
+        if err_msg:
+            await bot.send_message(admin_id, err_msg)
 
     await handlers.cancel(error.update.message or error.update.callback_query.message, state)
 

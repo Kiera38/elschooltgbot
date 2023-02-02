@@ -79,6 +79,11 @@ class ElschoolRepo:
         response = await session.get(url)
         if not response.ok:
             raise NoDataException(f"не удалось получить оценки с сервера, код ошибки {response.status}")
+        if str(response.url) != url:
+            print(response.url, url, str(response.url)==url)
+            raise NoDataException("не удалось получить оценки с сервера. Обычно такое происходит, "
+                                  "если не правильно указан логин или пароль. "
+                                  "Попробуй изменить логин или пароль")
         return self._parse_grades(await response.text())
 
     async def get_grades_and_url(self, jwtoken):
@@ -101,7 +106,7 @@ class ElschoolRepo:
             if str(response.url) != 'https://elschool.ru/users/privateoffice':
                 raise NotRegisteredException("Не удалась регистрация. Обычно такое происходит, "
                                              "если не правильно указан логин или пароль. "
-                                             "Попробуй изменить логин или пароль ", login=login, password=password)
+                                             "Попробуй изменить данные от аккаунта", login=login, password=password)
 
             jwtoken = session.cookie_jar.filter_cookies(self._url).get('JWToken')
             logger.info(f'получен jwtoken: {jwtoken}')
@@ -137,7 +142,7 @@ class ElschoolRepo:
                         quarter_grades[lesson_name.text] = grades_list
                     grades[quarters[quarter_index]] = quarter_grades
         except Exception:
-            raise NoDataException('данные получены в странном формате. Такое обычно происходит если сайт перенаправляет на другую страницу.')
+            raise NoDataException('данные получены в странном формате. Такое обычно происходит, если сайт перенаправляет на другую страницу.')
         return grades
 
 
