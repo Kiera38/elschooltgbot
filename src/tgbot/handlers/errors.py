@@ -52,7 +52,7 @@ async def error_handler(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMCo
     len_err = len(errtrace)
     await bot.send_message(admin_id, f'произошла ошибка у пользователя {username}')
     message_count = len_err // 15
-    for mindex in range(message_count):
+    for mindex in range(message_count+1):
         if mindex * 15 + 15 < len_err:
             err_msg = ''.join(errtrace[mindex*15:mindex*15+15])
         else:
