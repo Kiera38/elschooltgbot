@@ -43,20 +43,21 @@ async def timeout(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMContext)
 
 @error_router.errors(ExceptionTypeFilter(Exception))
 async def error_handler(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMContext):
-    try:
-        username = error.update.message.from_user.full_name
-    except AttributeError:
+    obj = error.update.message if error.update.message is not None else error.update.callback_query
+    if obj is not None:
+        username = obj.from_user.full_name
+    else:
         username = 'неизвестный пользователь'
     errtrace = traceback.format_exception(type(error.exception), error.exception, error.exception.__traceback__)
     len_err = len(errtrace)
-    if len_err > 15:
-        errtrace1 = html.code(fmt.text(*errtrace[:15], sep=''))
-        await bot.send_message(admin_id, f'произошла ошибка у пользователя {username}\n{errtrace1}')
-        errtrace = html.code(fmt.text(*errtrace[15:], sep=''))
-        await bot.send_message(admin_id, errtrace)
-    else:
-        errtrace = html.code(fmt.text(*errtrace))
-        await bot.send_message(admin_id, f'произошла ошибка у пользователя {username}\n{errtrace}')
+    await bot.send_message(admin_id, f'произошла ошибка у пользователя {username}')
+    message_count = len_err // 15
+    for mindex in range(message_count):
+        if mindex + 15 < len_err:
+            err_msg = ''.join(errtrace[mindex:mindex+15])
+        else:
+            err_msg = ''.join(errtrace[mindex:])
+        await bot.send_message(admin_id, err_msg)
 
     await handlers.cancel(error.update.message or error.update.callback_query.message, state)
 
