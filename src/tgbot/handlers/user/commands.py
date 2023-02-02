@@ -217,6 +217,7 @@ async def change_login(m: Message, state: FSMContext):
     await state.update_data(login=m.text)
     await state.set_state(Change.PASSWORD)
     await m.answer('хорошо, теперь напиши пароль')
+    await m.delete()
 
 
 @registered_router.message(StateFilter(Change.PASSWORD))
@@ -227,6 +228,7 @@ async def change_password(m: Message, state: FSMContext, repo: Repo):
     login = data['login']
     password = m.text
     await m.answer('проверка введённых данных, попытка регистрации')
+    await m.delete()
     jwtoken = await repo.register_user(login, password)
     user = repo.get_user(m.from_user.id)
     user.jwtoken = jwtoken
