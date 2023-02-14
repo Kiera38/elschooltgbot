@@ -1,9 +1,11 @@
 from typing import Callable, Dict, Any, Awaitable, cast
 
 from aiogram import BaseMiddleware, types
+from aiogram.fsm.context import FSMContext
 from aiogram.types import TelegramObject, Message, CallbackQuery
 
-from tgbot.services.repository import Repo
+from tgbot.services.repository import Repo, NoDataException
+from tgbot.states.user import Change
 
 
 class GradesMiddleware(BaseMiddleware):
@@ -21,7 +23,15 @@ class GradesMiddleware(BaseMiddleware):
             await message.answer('есть сохранённые оценки, показываю их')
         else:
             await message.answer('нет сохранённых оценок, сейчас получу новые, придётся подождать')
-        grades, time = await repo.get_grades(bot_user)
+        try:
+            grades, time = await repo.get_grades(bot_user)
+        except NoDataException:
+            state: FSMContext = data['state']
+            await state.set_state(Change.LOGIN)
+            await message.answer('Кажется, что elschool обновил некоторые данные о тебе. '
+                                 'Чтобы я смог продолжить получать оценки, я должен обновить эти данные.'
+                                 'Для этого понадобится ввести логин и пароль. Сначала логин.')
+            return
         if time:
             await message.answer(f'оценки получены за {time:.3f} с')
         if isinstance(bot_user.quarter, str):

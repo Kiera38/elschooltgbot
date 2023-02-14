@@ -128,7 +128,7 @@ async def version(m: Message):
 
 @router.message(Command('version_comments'))
 async def version_comments(m: Message):
-    await m.answer("""моя версия: 2.5.7 (3 обновление)
+    await m.answer("""моя версия: 2.5.8 (обновление 3.1)
 список изменений:
 Нормальная регистрация (разобрался, как можно сделать)
 Переход на aiogram 3.x (крупные компании обычно не меняют версии, но мне можно)
@@ -142,6 +142,7 @@ async def version_comments(m: Message):
 Обновление политики конфиденциальности
 Ну и естественно обновление сообщения в /help
 А ещё, как все разработчики любят писать, улучшена стабильность работы (ну кстати бот действительно должен работать стабильней)
+Исправил одну особенность elschool. Он иногда обновляет токен у всех пользователей. Теперь в таких случаях бот сообщает об этом и предлагает обновить данные пользователя.
 """)
 
 
@@ -234,7 +235,7 @@ async def change_password(m: Message, state: FSMContext, repo: Repo):
     user.jwtoken = jwtoken
     user.cached_grades = None
     await state.clear()
-    await m.answer('удалось зарегистрироваться, данные введены правильно')
+    await m.answer('удалось зарегистрироваться, данные введены правильно. Можешь получать оценки.')
 
 
 @registered_router.message(Command('unregister'))

@@ -109,7 +109,8 @@ async def change_quarter(query: CallbackQuery, state: FSMContext, repo: Repo):
 async def register(m: Message, state: FSMContext, repo: Repo):
     await state.set_state(Page.REGISTER)
     await state.update_data(message=m)
-    await m.answer('выбери действие', reply_markup=register_keyboard(repo.has_user(m.from_user.id)))
+    await m.answer('выбери действие', reply_markup=register_keyboard(
+        repo.has_user(m.from_user.id) and repo.get_user(m.from_user.id).jwtoken is not None))
 
 
 @router.callback_query(Text('register'), StateFilter(Page.REGISTER))
