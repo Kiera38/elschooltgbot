@@ -2,3 +2,4 @@
 bot.log
 *.pkl
 server.txt
+src/bot.ini
