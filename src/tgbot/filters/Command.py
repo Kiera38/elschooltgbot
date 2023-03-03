@@ -20,8 +20,9 @@ class CommandFilter(BaseFilter):
             '/clear_cache',
             '/new_version',
             '/reregister',
-            '/unregister'
+            '/unregister',
+            '/register'
         ]:
-            return not self.is_command
-        return self.is_command
+            return self.is_command
+        return not self.is_command
 
