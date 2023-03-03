@@ -1,7 +1,7 @@
 from typing import Any, Union, Dict
 
 from aiogram.filters import BaseFilter
-from aiogram.types import Message, User
+from aiogram.types import Message
 
 
 class CommandFilter(BaseFilter):
