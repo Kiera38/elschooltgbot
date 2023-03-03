@@ -3,6 +3,7 @@ from aiogram.filters import StateFilter, Command, Text
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 
+from tgbot.filters.Command import CommandFilter
 from tgbot.filters.user import RegisteredUserFilter
 from tgbot.handlers.utils import show_grades, show_fix_grades, show_grades_for_lesson, lower_keys
 from tgbot.keyboards.user import main_keyboard, row_list_keyboard, grades_keyboard, pick_grades_inline_keyboard, \
@@ -36,21 +37,16 @@ async def is_command(m: Message):
         return True
     return False
 
-@router.message(StateFilter(ParamsGetter.GET_LOGIN))
+@router.message(StateFilter(ParamsGetter.GET_LOGIN), CommandFilter())
 async def get_user_login(m: Message, state: FSMContext):
-    if await is_command(m):
-        return
     await state.update_data(login=m.text)
     await m.delete()
     await m.answer('логин получил, теперь напиши пароль')
     await state.set_state(ParamsGetter.GET_PASSWORD)
 
 
-@router.message(StateFilter(ParamsGetter.GET_PASSWORD))
+@router.message(StateFilter(ParamsGetter.GET_PASSWORD), CommandFilter())
 async def get_user_password(m: Message, repo: Repo, state: FSMContext):
-    if await is_command(m):
-        return
-
     await m.delete()
     data = await state.get_data()
     await m.answer('проверка введённых данных, попытка регистрации')
@@ -65,10 +61,8 @@ async def get_user_password(m: Message, repo: Repo, state: FSMContext):
 
 
 
-@router.message(StateFilter(ParamsGetter.GET_QUARTER))
+@router.message(StateFilter(ParamsGetter.GET_QUARTER), CommandFilter())
 async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
-    if await is_command(m):
-        return
     data = await state.get_data()
     if not m.text.isdigit():
         if m.text in data['quarters']:
@@ -305,10 +299,8 @@ async def help(m: Message):
 Также, если просто написать название урока можно получить подробную информацию по каждой оценке""")
 
 
-@registered_router.message(StateFilter(Change.QUARTER))
+@registered_router.message(StateFilter(Change.QUARTER), CommandFilter())
 async def quarter_changed(m: Message, state: FSMContext, repo: Repo):
-    if await is_command(m):
-        return
     user = repo.get_user(m.from_user.id)
     quarters = user.cached_grades
     if not m.text.isdigit():
@@ -342,7 +334,7 @@ async def change_quarter(m: Message, user: User, state: FSMContext, repo: Repo):
     await m.answer(f'выбери вариант', reply_markup=row_list_keyboard(quarters))
 
 
-@registered_router.message(Command('change_quarter'))
+@registered_router.message(Command('change_quarter'), CommandFilter())
 async def change_quarter_command(m: Message, repo: Repo, state: FSMContext):
     user = repo.get_user(m.from_user.id)
     await change_quarter(m, user, state, repo)
@@ -371,20 +363,16 @@ async def reregister(m: Message, state: FSMContext):
     await state.set_state(Change.LOGIN)
 
 
-@registered_router.message(StateFilter(Change.LOGIN))
+@registered_router.message(StateFilter(Change.LOGIN), CommandFilter())
 async def change_login(m: Message, state: FSMContext):
-    if await is_command(m):
-        return
     await state.update_data(login=m.text)
     await state.set_state(Change.PASSWORD)
     await m.answer('хорошо, теперь напиши пароль')
     await m.delete()
 
 
-@registered_router.message(StateFilter(Change.PASSWORD))
+@registered_router.message(StateFilter(Change.PASSWORD), CommandFilter())
 async def change_password(m: Message, state: FSMContext, repo: Repo):
-    if await is_command(m):
-        return
     data = await state.get_data()
     login = data['login']
     password = m.text
@@ -425,6 +413,11 @@ async def remove_data(query: CallbackQuery, repo: Repo, state: FSMContext):
 @router.message(RegisteredUserFilter(False))
 async def no_user(m: Message):
     await m.answer('тебя нет в списке пользователей, попробуй зарегистрироваться')
+
+
+@router.message(CommandFilter(True))
+async def text_is_command(message: Message):
+    await message.answer('по моему ты написал одну из моих команд. Тебя что попросили написать?')
 
 
 @grades_router.message()
