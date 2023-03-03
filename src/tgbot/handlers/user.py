@@ -23,25 +23,6 @@ async def text_is_command(message: Message):
     await message.answer('по моему ты написал одну из моих команд. Тебя что попросили написать?')
 
 
-async def is_command(m: Message):
-    if m.text in [
-        "/get_grades",
-        "/fix_grades",
-        '/start',
-        '/help',
-        '/version',
-        '/change_quarter',
-        '/cancel',
-        "/update_cache",
-        '/clear_cache',
-        '/new_version',
-        '/reregister',
-        '/unregister'
-    ]:
-        await m.answer('по моему ты написал одну из моих команд. Тебя что попросили написать?')
-        return True
-    return False
-
 @router.message(StateFilter(ParamsGetter.GET_LOGIN), CommandFilter())
 async def get_user_login(m: Message, state: FSMContext):
     await state.update_data(login=m.text)
@@ -69,20 +50,12 @@ async def get_user_password(m: Message, repo: Repo, state: FSMContext):
 @router.message(StateFilter(ParamsGetter.GET_QUARTER), CommandFilter())
 async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
     data = await state.get_data()
-    if not m.text.isdigit():
-        if m.text in data['quarters']:
-            quarter = m.text
-        else:
-            quarters = list(data['quarters'].keys())
-            await m.answer(f'тут немного не правильно написано, попробуй ещё раз', reply_markup=row_list_keyboard(quarters))
-            return
+    if m.text in data['quarters']:
+        quarter = m.text
     else:
-        quarter = int(m.text)
-        quarters = list(data['quarters'])
-        if quarter > len(quarters):
-            await m.answer(f'тут немного не правильно написано, попробуй ещё раз',reply_markup=row_list_keyboard(quarters))
-            return
-        quarter = quarters[quarter - 1]
+        quarters = list(data['quarters'].keys())
+        await m.answer(f'тут немного не правильно написано, попробуй ещё раз', reply_markup=row_list_keyboard(quarters))
+        return
     repo.add_user(m.from_user.id, User(data['jwtoken'], quarter, url=data['url']))
     await m.answer('регистрация завершена, теперь можешь получать оценки', reply_markup=main_keyboard())
     await m.delete()
@@ -120,19 +93,11 @@ async def grades(m: Message, state: FSMContext):
 async def grades_query(query: CallbackQuery, repo: Repo, state: FSMContext, next_state, answer_text: str, show_all):
     user = repo.get_user(query.from_user.id)
     if user.cached_grades:
-        if isinstance(user.quarter, str):
-            if user.quarter not in user.cached_grades:
-                await query.message.answer('такой четверти не существует, попробуй изменить четверть')
-                grades = {}
-            else:
-                grades = user.cached_grades[user.quarter]
+        if user.quarter not in user.cached_grades:
+            await query.message.answer('такой четверти не существует, попробуй изменить четверть')
+            grades = {}
         else:
-            if user.quarter-1 > len(list(user.cached_grades)):
-                await query.message.answer('такой четверти не существует, попробуй изменить четверть')
-                grades = {}
-            else:
-                grades = list(user.cached_grades.values())[user.quarter-1]
-                user.quarter = list(grades.keys())[user.quarter-1]
+            grades = user.cached_grades[user.quarter]
         lessons = list(grades.keys())
     else:
         lessons = []
@@ -286,20 +251,12 @@ async def help(m: Message):
 async def quarter_changed(m: Message, state: FSMContext, repo: Repo):
     user = repo.get_user(m.from_user.id)
     quarters = user.cached_grades
-    if not m.text.isdigit():
-        if m.text in quarters:
-            quarter = m.text
-        else:
-            quarters = list(quarters.keys())
-            await m.answer(f'тут немного не правильно написано, попробуй ещё раз', reply_markup=row_list_keyboard(quarters))
-            return
+    if m.text in quarters:
+        quarter = m.text
     else:
-        quarter = int(m.text)
-        quarters = list(quarters)
-        if quarter > len(quarters):
-            await m.answer(f'тут немного не правильно написано, попробуй ещё раз', reply_markup=row_list_keyboard(quarters))
-            return
-        quarter = quarters[quarter-1]
+        quarters = list(quarters.keys())
+        await m.answer(f'тут немного не правильно написано, попробуй ещё раз', reply_markup=row_list_keyboard(quarters))
+        return
     user.quarter = quarter
     await state.clear()
     await m.answer('изменил', reply_markup=main_keyboard())
