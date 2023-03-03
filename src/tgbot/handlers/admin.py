@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from tgbot.filters.role import RoleFilter
-from tgbot.handlers.user.commands import user_start
+from tgbot.handlers.user import user_start
 from tgbot.models.user import UserRole
 from tgbot.services.repository import Repo
 from tgbot.states.user import AdminState
