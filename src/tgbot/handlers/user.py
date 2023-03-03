@@ -3,7 +3,7 @@ from aiogram.filters import StateFilter, Command, Text
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 
-from tgbot.filters.Command import CommandFilter
+from tgbot.filters.command import CommandFilter
 from tgbot.filters.user import RegisteredUserFilter
 from tgbot.handlers.utils import show_grades, show_fix_grades, show_grades_for_lesson, lower_keys
 from tgbot.keyboards.user import main_keyboard, row_list_keyboard, grades_keyboard, pick_grades_inline_keyboard, \
