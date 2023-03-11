@@ -7,7 +7,7 @@ package-dir = { "" = "src" }
 
 [project]
 name = "elschool_bot"
-version = "2.5.8"
+version = "2.5.17.dev2"
 authors = [
     { name = "Maxim", email = "maxim@filjus.ru" },
 ]
@@ -19,7 +19,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "aiogram==3.0b6",
+    "aiogram==3.0b7",
     "aiohttp~=3.8.3",
     "beautifulsoup4~=4.11.1"
 ]
