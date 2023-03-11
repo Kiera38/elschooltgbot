@@ -9,6 +9,7 @@ from tgbot.states.user import Change
 
 
 class GradesMiddleware(BaseMiddleware):
+    """Получает оценки перед обработкой события."""
     async def __call__(self, handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
                        event: TelegramObject,
                        data: Dict[str, Any]) -> Any:

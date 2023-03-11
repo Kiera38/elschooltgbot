@@ -14,31 +14,38 @@ logger = logging.getLogger(__name__)
 
 
 class Repo:
+    """Класс для управления всеми пользователями."""
     def __init__(self, users):
         self.users: Dict[int, User] = users
         self.elschool_repo = ElschoolRepo()
 
     def add_user(self, user_id, user: User) -> None:
+        """Добавить нового пользователя."""
         self.users[user_id] = user
         logger.info(f'пользователь добавлен {user}')
 
     def list_users(self) -> List[User]:
-        """List all bot users"""
+        """Список всех пользователей"""
         return list(self.users.values())
 
     def user_ids(self):
+        """Список всех id пользователей"""
         return list(self.users.keys())
 
     def get_user(self, user_id):
+        """Получить конкретного пользователя."""
         return self.users.get(user_id)
 
     def remove_user(self, user_id):
+        """Удалить пользователя."""
         del self.users[user_id]
 
     async def register_user(self, login, password):
+        """Регистрация нового пользователя, возвращает его токен."""
         return await self.elschool_repo.register(login, password)
 
     async def get_grades_userdata(self, jwtoken, url=None):
+        """Получить оценки по токену."""
         start = time.time()
         logger.info('получаем новые оценки')
         if url:
@@ -50,6 +57,7 @@ class Repo:
         return grades, end - start, url
 
     async def get_grades(self, user):
+        """Получить оценки для пользователя."""
         if user.has_cached_grades:
             logger.info('используются кешированные оценки')
             return user.cached_grades, 0
@@ -58,10 +66,12 @@ class Repo:
         return grades, time
 
     def has_user(self, user_id):
+        """Существует ли пользователь с определённым id"""
         return user_id in self.users
 
 
 class ElschoolRepo:
+    """Класс для взаимодействия с сервером elchool"""
     def __init__(self):
         self._url = 'https://elschool.ru'
 
@@ -72,6 +82,7 @@ class ElschoolRepo:
         return 'https://elschool.ru/users/diaries/' + bs.find('a', text='Табель')['href']
 
     async def get_grades(self, jwtoken, url):
+        """Получить оценки с сервера."""
         async with aiohttp.ClientSession(cookies={'JWToken': jwtoken}) as session:
             return await self._get_grades(url, session)
 
@@ -87,12 +98,16 @@ class ElschoolRepo:
         return self._parse_grades(await response.text())
 
     async def get_grades_and_url(self, jwtoken):
+        """Получить оценки и адрес страницы пользователя.
+        Это эффективней, чем получение оценок и адреса по отдельности.
+        """
         async with aiohttp.ClientSession(cookies={'JWToken': jwtoken}) as session:
             url = await self._get_url(session)
             grades = await self._get_grades(url, session)
             return grades, url
 
     async def register(self, login, password):
+        """Регистрация пользователя по логину и паролю, возвращает токен."""
         async with aiohttp.ClientSession() as session:
             payload = {
                 'login': login,
@@ -147,10 +162,12 @@ class ElschoolRepo:
 
 
 class NotRegisteredException(Exception):
+    """Исключение, сообщающее о том, что регистрация не удалась."""
     def __init__(self, *args, login=None, password=None):
         super().__init__(*args)
         self.login = login
         self.password = password
 
 class NoDataException(Exception):
+    """Исключение, сообщающее о том, что не удалось получить некоторые данные с сервера."""
     pass

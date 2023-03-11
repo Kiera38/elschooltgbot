@@ -13,10 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 async def set_bot_commands(bot: Bot):
+    """Указать все команды бота."""
     await bot.set_my_commands(get_commands())
 
 
 async def run_bot():
+    """Запустить бота."""
     handlers = logging.FileHandler('bot.log'), logging.StreamHandler()
     logging.basicConfig(
         level=logging.DEBUG,

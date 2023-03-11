@@ -2,14 +2,16 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 
 
 def main_keyboard():
+    """Основная клавиатура."""
     return ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text='оценки')],
         [KeyboardButton(text='регистрация'), KeyboardButton(text='версия')],
-        [KeyboardButton(text='политика конфиденциальности')]
+        [KeyboardButton(text='политика конфиденциальности')] #TODO перенести в страницу регистрации.
     ], resize_keyboard=True)
 
 
 def grades_keyboard(show_back=False):
+    """Клавиатура для страницы оценки."""
     keyboard = [
         [InlineKeyboardButton(text='получить', callback_data='get_grades')],
         [InlineKeyboardButton(text='исправить', callback_data='fix_grades')],
@@ -21,11 +23,13 @@ def grades_keyboard(show_back=False):
 
 
 def add_cancel(buttons):
+    """Добавить в список кнопок кнопку для отмены действия. Вроде не используется."""
     buttons.append([KeyboardButton(text='назад'), KeyboardButton(text='отменить')])
     return buttons
 
 
 def pick_grades_keyboard(lessons=()):
+    """Клавиатура для выбора конкретного урока."""
     buttons = []
 
     if not lessons:
@@ -43,6 +47,7 @@ def pick_grades_keyboard(lessons=()):
 
 
 def pick_grades_inline_keyboard():
+    """Inline клавиатура, которая показывается при выборе конкретного урока."""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text='все', callback_data='all_grades')],
         [InlineKeyboardButton(text='назад', callback_data='back_grades'),
@@ -51,6 +56,7 @@ def pick_grades_inline_keyboard():
 
 
 def register_keyboard(registered=False):
+    """Клавиатура для страницы регистрация."""
     if not registered:
         return InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text='зарегистрироваться', callback_data='register')]
@@ -62,10 +68,12 @@ def register_keyboard(registered=False):
 
 
 def cancel_keyboard():
+    """Клавиатура для показа отмены действия."""
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text='отмена', callback_data='cancel')
     ]])
 
 
 def row_list_keyboard(lst):
+    """Клавиатура для показа списка по горизонтали."""
     return ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=text) for text in lst]], resize_keyboard=True)

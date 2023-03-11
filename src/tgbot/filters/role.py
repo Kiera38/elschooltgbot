@@ -3,12 +3,12 @@ from typing import Any, Union, Dict
 
 from aiogram.filters import BaseFilter
 from aiogram.types import Message, User
-from aiogram.types.base import TelegramObject
 
 from tgbot.models.user import UserRole
 
 
 class RoleFilter(BaseFilter):
+    """Фильтр для проверки роли."""
     async def __call__(self, message: Message, admin_id: int, event_from_user: User) -> Union[bool, Dict[str, Any]]:
         if self.roles is None:
             return True

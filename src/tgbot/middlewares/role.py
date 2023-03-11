@@ -7,6 +7,7 @@ from tgbot.models.user import UserRole
 
 
 class RoleMiddleware(BaseMiddleware):
+    """Сохраняет admin_id перед обработкой события."""
     def __init__(self, admin_id: int):
         super().__init__()
         self.admin_id = admin_id

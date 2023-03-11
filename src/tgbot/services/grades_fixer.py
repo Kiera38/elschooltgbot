@@ -1,4 +1,5 @@
 def fix_to4(grades):
+    """Как можно исправить оценку до 4."""
     results = []
     count_5 = 0
     while True:
@@ -18,6 +19,7 @@ def fix_to4(grades):
 
 
 def fix_to5(grades):
+    """Как можно исправить оценку до 5."""
     new_grades = grades.copy()
     added_grades = []
     while get_mean_gr(new_grades) < 4.5:
@@ -27,6 +29,7 @@ def fix_to5(grades):
 
 
 def get_mean_gr(grades):
+    """Средняя оценка."""
     if grades:
         sum_grades = sum(grades)
         return sum_grades / len(grades)

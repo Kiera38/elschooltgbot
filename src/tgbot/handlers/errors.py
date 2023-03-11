@@ -19,6 +19,7 @@ error_router = Router()
 
 @error_router.errors(ExceptionTypeFilter(NotRegisteredException))
 async def not_registered_handler(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMContext):
+    """Обработчик для исключения о неудачной регистрации."""
     exception = cast(NotRegisteredException, error.exception)
     message = error.update.message or error.update.callback_query.message
     await message.answer(f"произошла ошибка регистрации: {error.exception}")
@@ -30,6 +31,7 @@ async def not_registered_handler(error: ErrorEvent, admin_id: int, bot: Bot, sta
 
 @error_router.errors(ExceptionTypeFilter(NoDataException))
 async def no_data(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMContext):
+    """Обработчик для исключения о том, что не получилось получить некоторые данные с сервера."""
     message = error.update.message or error.update.callback_query.message
     await message.answer(f'произошла ошибка при получении оценок: {error.exception}')
     await error_handler(error, admin_id, bot, state)
@@ -37,6 +39,9 @@ async def no_data(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMContext)
 
 @error_router.errors(ExceptionTypeFilter(TimeoutError))
 async def timeout(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMContext):
+    """Обработчик для исключения о слишком долгом выполнении действия.
+    Сейчас не используется, т.к. все подобные исключения происходят за пределами обработчиков.
+    """
     message = error.update.message or error.update.callback_query.message
     await message.answer('Действие выполнялось слишком долго, из-за этого произошла ошибка.'
                          'Возможно, это могло произойти из-за плохого подключения к серверу elschool.'
@@ -46,6 +51,7 @@ async def timeout(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMContext)
 
 @error_router.errors(ExceptionTypeFilter(Exception))
 async def error_handler(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMContext):
+    """Обработчик для всех исключений."""
     obj = error.update.message if error.update.message is not None else error.update.callback_query
     if obj is not None:
         username = obj.from_user.full_name
@@ -67,4 +73,5 @@ async def error_handler(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMCo
 
 
 def register_errors(dp: Dispatcher):
+    """Добавить обработчики для всех исключений."""
     dp.include_router(error_router)

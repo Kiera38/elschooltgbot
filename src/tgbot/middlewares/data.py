@@ -9,9 +9,10 @@ from tgbot.services.repository import Repo
 
 
 class RepoMiddleware(BaseMiddleware):
-
+    """Добавляет repo перед обработкой события и сохраняет изменения после события.."""
     def __init__(self, file):
         super().__init__()
+        #TODO добавить роутер для обработчиков, которым не нужен repo и флаг для обработчиков, которые не изменяют repo
         if os.path.exists(file):
             with open(file, 'rb') as f:
                 self.users = pickle.load(f)

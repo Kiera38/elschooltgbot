@@ -17,25 +17,28 @@ admin_router.message.filter(RoleFilter(UserRole.ADMIN))
 
 @admin_router.message(Command('start'))
 async def admin_start(m: Message):
+    """Отдельный обработчик команды /start для админа. Остался от шаблона, не нужен, но используется."""
     await m.reply("Hello, admin!")
     await user_start(m)
 
 
 @admin_router.message(Command('send_message'))
 async def admin_send_messages(m: Message, state: FSMContext):
+    """Обработчик команды /send_message."""
     await m.answer('что хотите отправить?')
     await state.set_state(AdminState.SEND_MESSAGE)
 
 
 @admin_router.message(StateFilter(AdminState.SEND_MESSAGE))
 async def admin_message(m: Message, repo: Repo, state: FSMContext, bot: Bot):
+    """Отправляет сообщение всем пользователям."""
     await m.answer('отправляю')
     for user_id in repo.user_ids():
         try:
             await bot.send_message(user_id, m.text)
         except Exception:
             exc_m = ''.join(traceback.format_exc())
-            await m.answer(f'при отправке пользователю с id {user_id} произошло исключение {exc_m}')
+            await m.answer(f'при отправке пользователю с id {user_id} произошло исключение {exc_m}') #TODO: писать ссылку на пользователя а не id
 
     await state.clear()
     await m.answer('отправил')
@@ -43,13 +46,16 @@ async def admin_message(m: Message, repo: Repo, state: FSMContext, bot: Bot):
 
 @admin_router.message(Command('users_count'))
 async def users_count(m: Message, repo: Repo):
+    """Показать количество пользователей."""
     await m.answer(f'сейчас у меня {len(repo.list_users())} пользователей')
 
 
 async def no_admin(m: Message):
+    """Если не админ пытается использовать команды для админа."""
     await m.answer('эээ ты что. Тебе не доступно это действие. Оно может использоваться только моим разработчиком.')
 
 
 def register_admin(dp: Dispatcher):
+    """Добавить обработчики для команд админа."""
     dp.message.register(no_admin, RoleFilter(UserRole.USER), Command('send_message', 'users_count'))
     dp.include_router(admin_router)

@@ -5,6 +5,7 @@ from aiogram.utils import markdown as fmt
 
 
 def show_grades(grades):
+    """Создать строку для сообщения со всеми оценками."""
     text = ['вот твои оценки']
     floor_grades = {3: [], 4: [], 5: []}
     for name, grade in grades.items():
@@ -31,6 +32,7 @@ def show_grades(grades):
 
 
 def show_grade(name, grade):
+    """Вспомогательная функция для создания строки для 1 урока."""
     gr = ', '.join([str(gra['grade']) for gra in grade]) + ', '
     if gr == ', ':
         return fmt.text(html.underline(name), html.bold('нет оценок')), 0
@@ -40,10 +42,12 @@ def show_grade(name, grade):
 
 
 def lower_keys(grades):
+    """Создаёт словарь на основе другого в котором все строки написаны маленькими буквами."""
     return {key.lower(): value for key, value in grades.items()}
 
 
 def show_grades_for_lesson(grades):
+    """Создаёт строку для показа сообщения для 1 урока."""
     text = []
     for grade in grades:
         gr = grade['grade']
@@ -60,16 +64,19 @@ def show_grades_for_lesson(grades):
 
 
 def show_fix_to5(grades_list):
+    """Строка для показа, как можно исправить оценку до 5."""
     tooltips = ', '.join([str(i) for i in fix_to5(grades_list)])
     return fmt.text('для', html.italic('исправления оценки до 5'), 'можно получить', tooltips)
 
 
 def show_fix_to4(grades_list):
+    """Строка для показа, как можно исправить оценку до 4."""
     tooltips = ' или '.join([fmt.text(*var, sep=', ') for var in fix_to4(grades_list)])
     return fmt.text('для', html.italic('исправления оценки до 4'), 'можно получить', tooltips)
 
 
 def show_fix_grades(grades):
+    """Строка для отправки всех оценок и как их можно исправить."""
     text = []
     for name, grade in grades.items():
         txt, round_grade = show_grade(name, grade)
