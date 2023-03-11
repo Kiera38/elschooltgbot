@@ -2,11 +2,11 @@
 from aiogram.fsm.state import StatesGroup, State
 
 
-class ParamsGetter(StatesGroup): #TODO переименовать
+class Register(StatesGroup):
     """Состояния, используемые при регистрации."""
-    GET_LOGIN = State()
-    GET_PASSWORD = State()
-    GET_QUARTER = State()
+    LOGIN = State()
+    PASSWORD = State()
+    QUARTER = State()
 
 
 class Change(StatesGroup):

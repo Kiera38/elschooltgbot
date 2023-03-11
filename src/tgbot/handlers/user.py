@@ -12,7 +12,7 @@ from tgbot.keyboards.user import main_keyboard, row_list_keyboard, grades_keyboa
 from tgbot.middlewares.grades import GradesMiddleware
 from tgbot.models.user import User
 from tgbot.services.repository import Repo
-from tgbot.states.user import ParamsGetter, Change, Page
+from tgbot.states.user import Change, Page, Register
 
 router = Router()
 registered_router = Router()
@@ -27,16 +27,16 @@ async def text_is_command(message: Message):
     await message.answer('по моему ты написал одну из моих команд. Тебя что попросили написать?')
 
 
-@router.message(StateFilter(ParamsGetter.GET_LOGIN), CommandFilter())
+@router.message(StateFilter(Register.LOGIN), CommandFilter())
 async def get_user_login(m: Message, state: FSMContext):
     """Когда пользователь при регистрации написал логин, вызывается эта функция."""
     await state.update_data(login=m.text)
     await m.delete()
     await m.answer('логин получил, теперь напиши пароль')
-    await state.set_state(ParamsGetter.GET_PASSWORD)
+    await state.set_state(Register.PASSWORD)
 
 
-@router.message(StateFilter(ParamsGetter.GET_PASSWORD), CommandFilter())
+@router.message(StateFilter(Register.PASSWORD), CommandFilter())
 async def get_user_password(m: Message, repo: Repo, state: FSMContext):
     """Когда пользователь при регистрации написал пароль, вызывается эта функция."""
     await m.delete()
@@ -48,12 +48,12 @@ async def get_user_password(m: Message, repo: Repo, state: FSMContext):
     grades, time, url = await repo.get_grades_userdata(jwtoken)
     quarters = list(grades)
     await state.update_data(url=url, quarters=list(grades.keys()))
-    await state.set_state(ParamsGetter.GET_QUARTER)
+    await state.set_state(Register.QUARTER)
     await m.answer(f'оценки получил за {time:.3f}с. Выбери какие оценки мне нужно показывать', reply_markup=row_list_keyboard(quarters))
 
 
 
-@router.message(StateFilter(ParamsGetter.GET_QUARTER), CommandFilter())
+@router.message(StateFilter(Register.QUARTER), CommandFilter())
 async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
     """Когда пользователь при регистрации указал четверть, вызывается эта функция."""
     data = await state.get_data()
@@ -72,7 +72,7 @@ async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
 @router.message(Command('register'))
 async def register(m: Message, state: FSMContext):
     """Когда пользователь захотел зарегистрироваться."""
-    await state.set_state(ParamsGetter.GET_LOGIN)
+    await state.set_state(Register.LOGIN)
     await m.answer('сейчас нужно ввести свои данные, сначала логин')
 
 
@@ -261,7 +261,6 @@ async def help(m: Message):
 /fix_grades - получить все оценки и как можно их исправить
 /help - показать это сообщение
 /version - показать версию и список изменений в последнем обновлении
-/new_version - показать , что будет в следующем обновлении
 /privacy_policy - посмотреть политику конфиденциальности 
 /cancel - сбросить текущее состояние
 /clear_cache - удалить сохранённые оценки.
