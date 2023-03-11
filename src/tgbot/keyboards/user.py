@@ -1,3 +1,4 @@
+"""Клавиатуры для пользователя."""
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 
 

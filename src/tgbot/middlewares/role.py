@@ -1,9 +1,8 @@
+"""Middleware для указания id админа для работы фильтров."""
 from typing import Callable, Dict, Any, Awaitable
 
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
-
-from tgbot.models.user import UserRole
 
 
 class RoleMiddleware(BaseMiddleware):

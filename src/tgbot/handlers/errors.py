@@ -1,3 +1,4 @@
+"""Обработка ошибок, возникших при обработке событий."""
 import logging
 import traceback
 from typing import cast

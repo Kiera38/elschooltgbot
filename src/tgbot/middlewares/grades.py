@@ -1,3 +1,4 @@
+"""Middleware для получения оценок обработчиками."""
 from typing import Callable, Dict, Any, Awaitable, cast
 
 from aiogram import BaseMiddleware, types

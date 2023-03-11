@@ -1,3 +1,4 @@
+"""Различные состояния пользователя"""
 from aiogram.fsm.state import StatesGroup, State
 
 

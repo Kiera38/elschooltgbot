@@ -1,3 +1,4 @@
+"""Обработка основных событий, совершённых пользователем."""
 from aiogram import Router, Dispatcher
 from aiogram.filters import StateFilter, Command, Text
 from aiogram.fsm.context import FSMContext

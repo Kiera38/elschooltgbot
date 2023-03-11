@@ -1,3 +1,4 @@
+"""Получение конфига бота из файла."""
 import configparser
 from dataclasses import dataclass
 

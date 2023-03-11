@@ -1,3 +1,4 @@
+"""Middleware для возможности получения repo обработчиками."""
 import os.path
 import pickle
 from typing import Callable, Dict, Any, Awaitable

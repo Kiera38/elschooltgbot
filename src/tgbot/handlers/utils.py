@@ -1,3 +1,4 @@
+"""Вспомогательные функции для обработчиков."""
 from tgbot.services.grades_fixer import get_mean_gr, fix_to4, fix_to5
 from aiogram import html
 from aiogram.utils import markdown as fmt

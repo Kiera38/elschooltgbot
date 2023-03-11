@@ -1,5 +1,4 @@
-#
-
+"""Основная логика взаимодействия с elschool."""
 import logging
 import time
 from typing import List, Dict
@@ -71,7 +70,7 @@ class Repo:
 
 
 class ElschoolRepo:
-    """Класс для взаимодействия с сервером elchool"""
+    """Класс для взаимодействия с сервером elschool"""
     def __init__(self):
         self._url = 'https://elschool.ru'
 
@@ -167,6 +166,7 @@ class NotRegisteredException(Exception):
         super().__init__(*args)
         self.login = login
         self.password = password
+
 
 class NoDataException(Exception):
     """Исключение, сообщающее о том, что не удалось получить некоторые данные с сервера."""

@@ -1,3 +1,4 @@
+"""Обработчики для действий админа."""
 import traceback
 
 from aiogram import Dispatcher, Router, Bot
@@ -38,7 +39,7 @@ async def admin_message(m: Message, repo: Repo, state: FSMContext, bot: Bot):
             await bot.send_message(user_id, m.text)
         except Exception:
             exc_m = ''.join(traceback.format_exc())
-            await m.answer(f'при отправке пользователю с id {user_id} произошло исключение {exc_m}') #TODO: писать ссылку на пользователя а не id
+            await m.answer(f'при отправке пользователю с id tg://user?id={user_id} произошло исключение {exc_m}')
 
     await state.clear()
     await m.answer('отправил')

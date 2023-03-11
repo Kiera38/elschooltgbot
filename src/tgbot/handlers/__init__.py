@@ -1,3 +1,5 @@
+"""Настройка обработчиков для событий telegram"""
+
 from aiogram import Dispatcher
 from aiogram.filters import Command, StateFilter, Text
 from aiogram.fsm.context import FSMContext
@@ -6,22 +8,25 @@ from tgbot.handlers import user, admin, errors
 from tgbot.keyboards.user import main_keyboard
 
 
+commands = {
+    '/register': 'указать данные для получения оценок',
+    '/get_grades': 'получить оценки',
+    '/fix_grades': 'исправить все оценки',
+    '/start': 'запустить бота и добавить в список пользователей',
+    '/help': 'как пользоваться ботом',
+    '/version': 'моя версия и список изменений',
+    '/change_quarter': 'изменить четверть (полугодие)',
+    '/reregister': 'изменить свои данные',
+    '/unregister': 'удалить все данные',
+    '/cancel': 'сбросить текущее состояние',
+    '/update_cache': 'обновить сохранённые оценки',
+    '/clear_cache': 'очистить сохранённые оценки'
+}
+
+
 def get_commands():
     """Получить все команды бота для отправки их в set_my_commands."""
-    #TODO сейчас все команды записаны в нескольких местах. Их нужно объединить в одно место.
-    return [BotCommand(command='/register', description='указать данные для получения оценок'),
-            BotCommand(command="/get_grades", description="получить оценки"),
-            BotCommand(command="/fix_grades", description="исправить все оценки"),
-            BotCommand(command='/start', description='запустить бота и добавить в список пользователей'),
-            BotCommand(command='/help', description='как пользоваться ботом'),
-            BotCommand(command='/version', description='моя версия и список изменений'),
-            BotCommand(command='/new_version', description='список изменений в будущей версии'),
-            BotCommand(command='/change_quarter', description='изменить четверть (полугодие)'),
-            BotCommand(command="/reregister", description='изменить свои данные'),
-            BotCommand(command='/unregister', description='удалить все данные'),
-            BotCommand(command='/cancel', description='сбросить текущее состояние'),
-            BotCommand(command="/update_cache", description="обновить сохранённые оценки"),
-            BotCommand(command='/clear_cache', description='очистить сохранённые оценки')]
+    return [BotCommand(name=name, description=description) for name, description in commands.items()]
 
 
 async def cancel(m: Message, state: FSMContext):
