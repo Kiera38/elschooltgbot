@@ -26,7 +26,7 @@ commands = {
 
 def get_commands():
     """Получить все команды бота для отправки их в set_my_commands."""
-    return [BotCommand(name=name, description=description) for name, description in commands.items()]
+    return [BotCommand(command=command, description=description) for command, description in commands.items()]
 
 
 async def cancel(m: Message, state: FSMContext):

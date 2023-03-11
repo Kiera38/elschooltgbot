@@ -319,14 +319,20 @@ async def change_quarter(query: CallbackQuery, state: FSMContext, repo: Repo):
 
 
 @router.message(Command('privacy_policy'))
-@router.message(Text('политика конфиденциальности'))
 async def privacy_policy(m: Message):
     """Показать политику конфиденциальности."""
     await m.answer('это что-то похожее на политику конфиденциальности. '
                    'Если кто-то напишет нормальную политику конфиденциальности, я её обновлю.')
     await m.answer("Для получения оценок бот просит логин и пароль от журнала elschool. "
                    "Эти данные используются только для получения токена. "
-                   "Этот токен используется для получения оценок. Никак ваши данные из него получить нельзя")
+                   "Этот токен используется для получения оценок. Никак ваши данные из него получить нельзя", reply_markup=main_keyboard())
+
+
+@router.callback_query(Text('privacy_policy'), StateFilter(Page.REGISTER))
+async def privacy_policy_query(query: CallbackQuery, state: FSMContext):
+    await privacy_policy(query.message)
+    await query.answer()
+    await state.clear()
 
 
 @registered_router.message(Command('reregister'))

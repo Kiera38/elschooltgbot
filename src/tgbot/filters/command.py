@@ -3,7 +3,7 @@ from typing import Any, Union, Dict
 from aiogram.filters import BaseFilter
 from aiogram.types import Message
 
-from tgbot.handlers import commands
+from tgbot import handlers
 
 
 class CommandFilter(BaseFilter):
@@ -14,4 +14,6 @@ class CommandFilter(BaseFilter):
         self.is_command = is_command
 
     async def __call__(self, message: Message) -> Union[bool, Dict[str, Any]]:
-        return message.text in commands == self.is_command
+        return (message.text in handlers.commands) == self.is_command
+
+

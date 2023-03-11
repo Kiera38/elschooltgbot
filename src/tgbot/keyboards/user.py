@@ -6,8 +6,7 @@ def main_keyboard():
     """Основная клавиатура."""
     return ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text='оценки')],
-        [KeyboardButton(text='регистрация'), KeyboardButton(text='версия')],
-        [KeyboardButton(text='политика конфиденциальности')] #TODO перенести в страницу регистрации.
+        [KeyboardButton(text='регистрация'), KeyboardButton(text='версия')]
     ], resize_keyboard=True)
 
 
@@ -60,11 +59,13 @@ def register_keyboard(registered=False):
     """Клавиатура для страницы регистрация."""
     if not registered:
         return InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text='зарегистрироваться', callback_data='register')]
+            [InlineKeyboardButton(text='зарегистрироваться', callback_data='register')],
+            [InlineKeyboardButton(text='политика конфиденциальности', callback_data='privacy_policy')]
         ])
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text='изменить данные', callback_data='change_data')],
-        [InlineKeyboardButton(text='удалить данные', callback_data='remove_data')]
+        [InlineKeyboardButton(text='удалить данные', callback_data='remove_data')],
+        [InlineKeyboardButton(text='политика конфиденциальности', callback_data='privacy_policy')]
     ])
 
 

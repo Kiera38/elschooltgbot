@@ -36,15 +36,9 @@ class GradesMiddleware(BaseMiddleware):
             return
         if time:
             await message.answer(f'оценки получены за {time:.3f} с')
-        if isinstance(bot_user.quarter, str):
-            if bot_user.quarter not in grades:
-                await message.answer('такой четверти не существует, попробуй изменить четверть')
-                return
-            data['grades'] = grades[bot_user.quarter]
-        else:
-            if bot_user.quarter-1 > len(list(grades)):
-                await message.answer('такой четверти не существует, попробуй изменить четверть')
-                return
-            data['grades'] = list(grades.values())[bot_user.quarter-1]
-            bot_user.quarter = list(grades.keys())[bot_user.quarter-1]
+        if bot_user.quarter not in grades:
+            await message.answer('такой четверти не существует, попробуй изменить четверть')
+            return
+        data['grades'] = grades[bot_user.quarter]
+
         return await handler(event, data)
