@@ -234,7 +234,7 @@ async def fix_all_grades(query: CallbackQuery, grades: dict, state: FSMContext):
 @router.message(Text('версия'))
 async def version(m: Message):
     """Показать версию и список изменений."""
-    await m.answer("""моя версия: 2.5.17.dev2 (обновление 3.2)
+    await m.answer("""моя версия: 2.5.18 (обновление 3.2)
 список изменений:
 Исправление ошибок
 """)
@@ -243,7 +243,7 @@ async def version(m: Message):
 @router.message(Command('version_comments'))
 async def version_comments(m: Message):
     """Подробно показать список изменений."""
-    await m.answer("""моя версия: 2.5.17.dev2 (обновление 3.2)
+    await m.answer("""моя версия: 2.5.18 (обновление 3.2)
 
 Исправление ошибок (ну как исправление. Скорее мойка кота.)
 Код упрощён и почищен, улучшен. Если более конкретно, то удалены и перемещены некоторые функции.

@@ -117,7 +117,7 @@ class ElschoolRepo:
             if not response.ok:
                 raise NotRegisteredException(f"Не удалось выполнить регистрацию, код сервера {response.status}")
 
-            if str(response.url) != 'https://elschool.ru/users/privateoffice':
+            if not str(response.url).startswith('https://elschool.ru/users/privateoffice'):
                 raise NotRegisteredException("Не удалась регистрация. Обычно такое происходит, "
                                              "если не правильно указан логин или пароль. "
                                              "Попробуй изменить данные от аккаунта", login=login, password=password)
