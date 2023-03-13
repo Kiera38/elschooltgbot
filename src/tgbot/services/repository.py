@@ -75,7 +75,7 @@ class ElschoolRepo:
         self._url = 'https://elschool.ru'
 
     async def _get_url(self, session):
-        response = await session.get(f'{self._url}/users/diaries')
+        response = await session.get(f'{self._url}/users/diaries', ssl=False)
         html = await response.text()
         bs = BeautifulSoup(html, 'html.parser')
         return 'https://elschool.ru/users/diaries/' + bs.find('a', text='Табель')['href']
@@ -86,7 +86,7 @@ class ElschoolRepo:
             return await self._get_grades(url, session)
 
     async def _get_grades(self, url, session):
-        response = await session.get(url)
+        response = await session.get(url, sss=False)
         if not response.ok:
             raise NoDataException(f"не удалось получить оценки с сервера, код ошибки {response.status}")
         if str(response.url) != url:
