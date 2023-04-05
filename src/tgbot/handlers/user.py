@@ -63,7 +63,7 @@ async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
         quarters = list(data['quarters'].keys())
         await m.answer(f'тут немного не правильно написано, попробуй ещё раз', reply_markup=row_list_keyboard(quarters))
         return
-    repo.add_user(m.from_user.id, User(data['jwtoken'], quarter, url=data['url']))
+    await repo.add_user(m.from_user.id, User(data['jwtoken'], quarter, url=data['url']))
     await m.answer('регистрация завершена, теперь можешь получать оценки', reply_markup=main_keyboard())
     await m.delete()
     await state.clear()
@@ -81,8 +81,7 @@ async def keyboard_register(m: Message, state: FSMContext, repo: Repo):
     """Показывает страницу регистрации клавиатуры."""
     await state.set_state(Page.REGISTER)
     await state.update_data(message=m)
-    await m.answer('выбери действие', reply_markup=register_keyboard(
-        repo.has_user(m.from_user.id) and repo.get_user(m.from_user.id).jwtoken is not None))
+    await m.answer('выбери действие', reply_markup=register_keyboard(await repo.check_has_user(m.from_user.id)))
 
 
 @router.callback_query(Text('register'), StateFilter(Page.REGISTER))
@@ -103,16 +102,7 @@ async def grades(m: Message, state: FSMContext):
 
 async def grades_query(query: CallbackQuery, repo: Repo, state: FSMContext, next_state, answer_text: str):
     """Вспомогательная функция для обработки действий со страницы оценок."""
-    user = repo.get_user(query.from_user.id)
-    if user.cached_grades:
-        if user.quarter not in user.cached_grades:
-            await query.message.answer('такой четверти не существует, попробуй изменить четверть')
-            grades = {}
-        else:
-            grades = user.cached_grades[user.quarter]
-        lessons = list(grades.keys())
-    else:
-        lessons = []
+    lessons = await repo.get_user_lessons(query.from_user.id)
     await state.set_state(next_state)
     await query.answer()
     await query.message.edit_reply_markup(pick_grades_inline_keyboard())
@@ -174,18 +164,16 @@ async def keyboard_fix_grades(m: Message, grades: dict, state: FSMContext):
 @registered_router.message(Command('clear_cache'))
 async def clear_cache(m: Message, repo: Repo):
     """Очистка сохранённых оценок."""
-    user = repo.get_user(m.from_user.id)
-    user.cached_grades = None
+    await repo.clear_user_cache(m.from_user.id)
     await m.answer('очистил сохранённые оценки')
 
 
 @registered_router.message(Command('update_cache'))
 async def update_cache(m: Message, repo: Repo):
     """Обновление сохранённых оценок."""
-    await clear_cache(m, repo)
     await m.answer('обновляю сохранённые оценки')
-    grades, time = await repo.get_grades(repo.get_user(m.from_user.id))
-    await m.answer(f'оценки обновлены за {time: _.3f} с')
+    _, time = await repo.update_cache(m.from_user.id)
+    await m.answer(f'оценки обновлены за {time: .3f} с')
 
 
 @registered_router.callback_query(Text('back_grades'))
@@ -234,7 +222,7 @@ async def fix_all_grades(query: CallbackQuery, grades: dict, state: FSMContext):
 @router.message(Text('версия'))
 async def version(m: Message):
     """Показать версию и список изменений."""
-    await m.answer("""моя версия: 2.5.18 (обновление 3.2)
+    await m.answer("""моя версия: 2.6.11.dev0 (обновление 4.0)
 список изменений:
 Исправление ошибок
 """)
@@ -243,7 +231,7 @@ async def version(m: Message):
 @router.message(Command('version_comments'))
 async def version_comments(m: Message):
     """Подробно показать список изменений."""
-    await m.answer("""моя версия: 2.5.18 (обновление 3.2)
+    await m.answer("""моя версия: 2.6.11.dev0 (обновление 4.0)
 
 Исправление ошибок (ну как исправление. Скорее мойка кота.)
 Код упрощён и почищен, улучшен. Если более конкретно, то удалены и перемещены некоторые функции.
@@ -277,44 +265,34 @@ async def help(m: Message):
 @registered_router.message(StateFilter(Change.QUARTER), CommandFilter())
 async def quarter_changed(m: Message, state: FSMContext, repo: Repo):
     """Когда пользователь выбрал четверть после того, как захотел её изменить."""
-    user = repo.get_user(m.from_user.id)
-    quarters = user.cached_grades
+    quarters = await repo.get_quarters(m.from_user.id)
     if m.text in quarters:
         quarter = m.text
     else:
-        quarters = list(quarters.keys())
         await m.answer(f'тут немного не правильно написано, попробуй ещё раз', reply_markup=row_list_keyboard(quarters))
         return
-    user.quarter = quarter
+    await repo.set_user_quarter(m.from_user.id, quarter)
     await state.clear()
     await m.answer('изменил', reply_markup=main_keyboard())
 
 
-async def change_quarter(m: Message, user: User, state: FSMContext, repo: Repo):
+async def change_quarter(m: Message, user_id: int, state: FSMContext, repo: Repo):
     """Пользователь захотел изменить четверть."""
     await state.set_state(Change.QUARTER)
-    if user.cached_grades:
-        grades = user.cached_grades
-    else:
-        await m.answer('нет сохранённых, оценок. Чтобы узнать какие есть варианты, сейчас получу оценки')
-        grades, time = await repo.get_grades(user)
-        await m.answer(f'оценки получил за {time:.3f}с')
-    quarters = list(grades.keys())
+    quarters = await repo.get_quarters(user_id)
     await m.answer(f'выбери вариант', reply_markup=row_list_keyboard(quarters))
 
 
 @registered_router.message(Command('change_quarter'), CommandFilter())
 async def change_quarter_command(m: Message, repo: Repo, state: FSMContext):
     """Пользователь захотел изменить четверть из клавиатуры."""
-    user = repo.get_user(m.from_user.id)
-    await change_quarter(m, user, state, repo)
+    await change_quarter(m, m.from_user.id, state, repo)
 
 
 @registered_router.callback_query(Text('change_quarter'))
-async def change_quarter(query: CallbackQuery, state: FSMContext, repo: Repo):
+async def change_quarter_query(query: CallbackQuery, state: FSMContext, repo: Repo):
     """Пользователь захотел изменить четверть с помощью команды."""
-    user = repo.get_user(query.from_user.id)
-    await change_quarter(query.message, user, state, repo)
+    await change_quarter(query.message, query.from_user.id, state, repo)
     await query.answer()
 
 
@@ -363,9 +341,7 @@ async def change_password(m: Message, state: FSMContext, repo: Repo):
     await m.answer('проверка введённых данных, попытка регистрации')
     await m.delete()
     jwtoken = await repo.register_user(login, password)
-    user = repo.get_user(m.from_user.id)
-    user.jwtoken = jwtoken
-    user.cached_grades = None
+    await repo.update_user_token(m.from_user.id, jwtoken)
     await state.clear()
     await m.answer('удалось зарегистрироваться, данные введены правильно. Можешь получать оценки.')
 
@@ -384,12 +360,8 @@ async def unregister(m: Message, repo: Repo):
     Как всегда, это обработчик для команды и вспомогательная
     функция при обработке события нажатия кнопки.
     """
-    try:
-        repo.remove_user(m.from_user.id)
-    except KeyError:
-        await m.answer('ээээ. Ты куда собрался. Тебя нет в моём списке', reply_markup=main_keyboard())
-    else:
-        await m.answer('я тебя удалил.', reply_markup=main_keyboard())
+    await repo.remove_user(m.from_user.id)
+    await m.answer('я тебя удалил.', reply_markup=main_keyboard())
 
 
 @registered_router.callback_query(Text('remove_data'), StateFilter(Page.REGISTER))

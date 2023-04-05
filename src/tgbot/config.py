@@ -8,14 +8,12 @@ class TgBot:
     """Дааные о боте, полученные из файла bot.log"""
     token: str
     admin_id: int
-    use_pickle_memory: bool
 
 
 @dataclass
 class DataConfig:
     """Информация о том, где хранятся данные бота."""
-    users_pkl_file: str
-    memory_file: str
+    db_file: str
 
 
 @dataclass
@@ -36,7 +34,6 @@ def load_config(path: str):
         tg_bot=TgBot(
             token=tg_bot.get("token"),
             admin_id=tg_bot.getint("admin_id"),
-            use_pickle_memory=tg_bot.getboolean("use_pickle_memory"),
         ),
         data=DataConfig(**config["data"]),
     )

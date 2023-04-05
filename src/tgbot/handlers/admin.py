@@ -34,7 +34,7 @@ async def admin_send_messages(m: Message, state: FSMContext):
 async def admin_message(m: Message, repo: Repo, state: FSMContext, bot: Bot):
     """Отправляет сообщение всем пользователям."""
     await m.answer('отправляю')
-    for user_id in repo.user_ids():
+    for user_id in await repo.user_ids():
         try:
             await bot.send_message(user_id, m.text)
         except Exception:
@@ -48,7 +48,7 @@ async def admin_message(m: Message, repo: Repo, state: FSMContext, bot: Bot):
 @admin_router.message(Command('users_count'))
 async def users_count(m: Message, repo: Repo):
     """Показать количество пользователей."""
-    await m.answer(f'сейчас у меня {len(repo.list_users())} пользователей')
+    await m.answer(f'сейчас у меня {len(await repo.list_users())} пользователей')
 
 
 async def no_admin(m: Message):

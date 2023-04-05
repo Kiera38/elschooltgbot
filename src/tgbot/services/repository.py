@@ -1,11 +1,11 @@
 """Основная логика взаимодействия с elschool."""
 import logging
 import time
-from typing import List, Dict
+from typing import List
 
 import aiohttp
+import aiosqlite
 from bs4 import BeautifulSoup
-from aiogram import html
 
 from tgbot.models.user import User
 
@@ -14,30 +14,37 @@ logger = logging.getLogger(__name__)
 
 class Repo:
     """Класс для управления всеми пользователями."""
-    def __init__(self, users):
-        self.users: Dict[int, User] = users
+    def __init__(self, db: aiosqlite.Connection):
+        self.db = db
         self.elschool_repo = ElschoolRepo()
 
-    def add_user(self, user_id, user: User) -> None:
+    async def add_user(self, user_id, user: User) -> None:
         """Добавить нового пользователя."""
-        self.users[user_id] = user
-        logger.info(f'пользователь добавлен {user}')
+        async with self.db.execute('INSERT INTO Users VALUES (?, ?, ?, ?, ?, ?)',
+                                   (user_id, user.jwtoken, user.quarter, user.role.value, user.url, user.last_cache)):
+            logger.info(f'пользователь добавлен {user}')
+        await self.db.commit()
 
-    def list_users(self) -> List[User]:
+    async def list_users(self) -> List[User]:
         """Список всех пользователей"""
-        return list(self.users.values())
+        async with self.db.execute('SELECT jwtoken, quarter, role, url, last_cache FROM Users') as cursor:
+            return list(await cursor.fetchall())
 
-    def user_ids(self):
+    async def user_ids(self):
         """Список всех id пользователей"""
-        return list(self.users.keys())
+        async with self.db.execute('SELECT id FROM users') as cursor:
+            return list(await cursor.fetchall())
 
-    def get_user(self, user_id):
+    async def get_user(self, user_id):
         """Получить конкретного пользователя."""
-        return self.users.get(user_id)
+        async with self.db.execute('SELECT jwtoken, quarter, role, url, last_cache FROM Users WHERE id = ?',
+                                   (user_id,)) as cursor:
+            return await cursor.fetchone()
 
-    def remove_user(self, user_id):
+    async def remove_user(self, user_id):
         """Удалить пользователя."""
-        del self.users[user_id]
+        await self.db.execute('DELETE FROM Users WHERE id = ?', (user_id,))
+        await self.db.commit()
 
     async def register_user(self, login, password):
         """Регистрация нового пользователя, возвращает его токен."""
@@ -55,27 +62,86 @@ class Repo:
         logger.info(f'получены новые оценки за {end - start}')
         return grades, end - start, url
 
-    async def get_grades(self, user):
+    async def get_grades(self, user_id):
         """Получить оценки для пользователя."""
-        if user.has_cached_grades:
-            logger.info('используются кешированные оценки')
-            return user.cached_grades, 0
-        grades, time, user.url = await self.get_grades_userdata(user.jwtoken, user.url)
-        user.update_cache(grades)
-        return grades, time
+        async with self.db.cursor() as cursor:
+            await cursor.execute('SELECT last_cache, quarter, jwtoken, url FROM Users WHERE id=?', (user_id,))
+            # print(cursor.rowcount)
+            # assert cursor.rowcount == 1, 'несколько пользователей с одинаковым id'
+            last_cache, quarter, jwtoken, url = await cursor.fetchone()
+            if last_cache - time.time() < 3600:
+                await cursor.execute('SELECT name, date, value FROM QuarterLessonMarks WHERE user_id=? AND quarter=?',
+                                     (user_id, quarter))
+                cached_grades = {}
+                async for name, date, value in cursor:
+                    if name not in cached_grades:
+                        cached_grades[name] = []
+                    cached_grades[name].append({
+                        'date': date,
+                        'value': value
+                    })
+                return cached_grades, 0
 
-    def has_user(self, user_id):
+            return await self._update_cache(cursor, user_id, quarter, jwtoken, url)
+
+    async def has_user(self, user_id):
         """Существует ли пользователь с определённым id"""
-        return user_id in self.users
+        async with self.db.execute('SELECT EXISTS(SELECT id FROM Users WHERE id=?)', (user_id,)) as cursor:
+            return bool((await cursor.fetchone())[0])
+
+    async def update_user_token(self, user_id, jwtoken):
+        await self.db.execute('UPDATE Users SET jwtoken = ?, last_cache = 0 WHERE id = ?',
+                                   (jwtoken, user_id))
+        await self.db.commit()
+
+    async def check_has_user(self, user_id):
+        async with self.db.execute('SELECT EXISTS(SELECT id FROM Users WHERE id=? AND jwtoken IS NOT NULL)',
+                                   (user_id,)) as cursor:
+            return bool((await cursor.fetchone())[0])
+
+    async def clear_user_cache(self, user_id):
+        await self.db.execute('DELETE FROM QuarterLessonMarks WHERE user_id = :user_id AND quarter = '
+                              '  (SELECT quarter FROM Users WHERE id = :user_id)', {'user_id': user_id})
+        await self.db.commit()
+
+    async def update_cache(self, user_id):
+        async with self.db.cursor() as cursor:
+            await cursor.execute('SELECT quarter, jwtoken, url FROM Users WHERE id=?', (user_id,))
+            quarter, jwtoken, url = await cursor.fetchone()
+            return await self._update_cache(cursor, user_id, quarter, jwtoken, url)
+
+    async def _update_cache(self, cursor, user_id, quarter, jwtoken, url):
+        grades, get_time, url = await self.get_grades_userdata(jwtoken, url)
+        quarter_grades = grades[quarter]
+        await cursor.execute('UPDATE Users SET last_cache = ? WHERE id = ?', (time.time(), user_id))
+        await cursor.execute('DELETE FROM QuarterLessonMarks WHERE user_id = ? AND quarter = ?', (user_id, quarter))
+        await cursor.executemany('INSERT INTO QuarterUserMarks VALUES (?, ?, ?, ?, ?)',
+                                 [(user_id, quarter, name, value['date'], value['value'])
+                                  for name, values in quarter_grades.items() for value in values])
+        await self.db.commit()
+        return quarter_grades, get_time
+
+    async def get_quarters(self, user_id):
+        async with self.db.execute('SELECT DISTINCT quarter FROM QuarterLessonMarks WHERE user_id = ?',
+                                   (user_id,)) as cursor:
+            return [row[0] async for row in cursor]
+
+    async def set_user_quarter(self, user_id, quarter):
+        await self.db.execute('UPDATE Users SET quarter = ? WHERE id = ?' , (quarter, user_id))
+        await self.db.commit()
+
+    async def get_user_lessons(self, user_id):
+        async with self.db.execute('SELECT DISTINCT name FROM QuarterLessonMarks WHERE user_id = :user_id AND quarter = '
+                                   '    (SELECT quarter FROM Users WHERE id = :user_id)', {'user_id': user_id}) as cursor:
+            return [row[0] async for row in cursor]
+
 
 
 class ElschoolRepo:
     """Класс для взаимодействия с сервером elschool"""
-    def __init__(self):
-        self._url = 'https://elschool.ru'
 
     async def _get_url(self, session):
-        response = await session.get(f'{self._url}/users/diaries')
+        response = await session.get(f'https://elschool.ru/users/diaries', ssl=False)
         html = await response.text()
         bs = BeautifulSoup(html, 'html.parser')
         return 'https://elschool.ru/users/diaries/' + bs.find('a', text='Табель')['href']
@@ -86,11 +152,10 @@ class ElschoolRepo:
             return await self._get_grades(url, session)
 
     async def _get_grades(self, url, session):
-        response = await session.get(url)
+        response = await session.get(url, ssl=False)
         if not response.ok:
             raise NoDataException(f"не удалось получить оценки с сервера, код ошибки {response.status}")
-        if str(response.url) != url:
-            print(response.url, url, str(response.url)==url)
+        if not str(response.url).startswith(url):
             raise NoDataException("не удалось получить оценки с сервера. Обычно такое происходит, "
                                   "если не правильно указан логин или пароль. "
                                   "Попробуй изменить логин или пароль")
@@ -112,7 +177,7 @@ class ElschoolRepo:
                 'login': login,
                 'password': password
             }
-            response = await session.post(f'{self._url}/Logon/Index', params=payload, ssl=False)
+            response = await session.post(f'https://elschool.ru/Logon/Index', params=payload, ssl=False)
             logger.info(f'register response :{response}')
             if not response.ok:
                 raise NotRegisteredException(f"Не удалось выполнить регистрацию, код сервера {response.status}")
@@ -122,7 +187,7 @@ class ElschoolRepo:
                                              "если не правильно указан логин или пароль. "
                                              "Попробуй изменить данные от аккаунта", login=login, password=password)
 
-            jwtoken = session.cookie_jar.filter_cookies(self._url).get('JWToken')
+            jwtoken = session.cookie_jar.filter_cookies('https://elschool.ru').get('JWToken')
             logger.info(f'получен jwtoken: {jwtoken}')
             if not jwtoken or not jwtoken.value:
                 raise NotRegisteredException('Регистрация удалась, но не найден токен. '
@@ -150,7 +215,7 @@ class ElschoolRepo:
                         grades_list = []
                         for grade in lesson_grades[quarter_index].find_all('span', class_='mark-span'):
                             grades_list.append({
-                                'grade': int(grade.text),
+                                'value': int(grade.text),
                                 'date': grade['data-popover-content'].split('<p>')
                             })
                         quarter_grades[lesson_name.text] = grades_list

@@ -10,8 +10,8 @@ class RegisteredUserFilter(BaseFilter):
     """Фильтр для проверки регистрации пользователя."""
 
     async def __call__(self, message: Message, event_from_user: User, repo: Repo) -> Union[bool, Dict[str, Any]]:
-        return (repo.has_user(event_from_user.id) and
-                repo.get_user(event_from_user.id).jwtoken is not None) == self.is_user
+        has_user = (await repo.check_has_user(event_from_user.id))
+        return has_user == self.is_user
 
     def __init__(self, is_user: bool):
         self.is_user = is_user

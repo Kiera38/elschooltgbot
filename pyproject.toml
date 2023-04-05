@@ -7,7 +7,7 @@ package-dir = { "" = "src" }
 
 [project]
 name = "elschool_bot"
-version = "2.5.17.dev2"
+version = "2.6.9.dev0"
 authors = [
     { name = "Maxim", email = "maxim@filjus.ru" },
 ]
@@ -19,9 +19,10 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "aiogram==3.0b7",
+    "aiogram==3.0b6",
     "aiohttp~=3.8.3",
-    "beautifulsoup4~=4.11.1"
+    "beautifulsoup4~=4.11.1",
+    "aiosqlite==0.18.0"
 ]
 [project.optional-dependencies]
 test = [
@@ -32,4 +33,4 @@ lint = [
 ]
 
 [project.scripts]
-tgbot = "tgbot.main:main"
+tgbot = "tgbot"
