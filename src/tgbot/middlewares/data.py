@@ -14,7 +14,6 @@ class RepoMiddleware(BaseMiddleware):
     """Добавляет repo перед обработкой события и сохраняет изменения после события.."""
     def __init__(self, file):
         super().__init__()
-        #TODO добавить роутер для обработчиков, которым не нужен repo и флаг для обработчиков, которые не изменяют repo
         self.file = file
 
     async def __call__(self, handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],

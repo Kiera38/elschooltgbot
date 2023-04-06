@@ -31,4 +31,6 @@ class GradesMiddleware(BaseMiddleware):
                                     reply_markup=main_keyboard())
             return
         data['grades'] = grades
+        if time:
+            await message.edit_text(f'оценки получил за {time: .3f}')
         return await handler(event, data)

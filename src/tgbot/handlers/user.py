@@ -17,14 +17,7 @@ from tgbot.states.user import Change, Page, Register
 router = Router()
 registered_router = Router()
 grades_router = Router()
-
-
-@router.message(CommandFilter(True))
-async def text_is_command(message: Message):
-    """В случае, если пользователь написал команду вместо того,
-    что его попросили, будет вызываться эта функция.
-    """
-    await message.answer('по моему ты написал одну из моих команд. Тебя что попросили написать?')
+not_command_router = Router()
 
 
 @router.message(StateFilter(Register.LOGIN), CommandFilter())
@@ -222,19 +215,22 @@ async def fix_all_grades(query: CallbackQuery, grades: dict, state: FSMContext):
 @router.message(Text('версия'))
 async def version(m: Message):
     """Показать версию и список изменений."""
-    await m.answer("""моя версия: 2.6.11.dev0 (обновление 4.0)
+    await m.answer("""моя версия: 2.6.14.dev0 (обновление 4.0)
 список изменений:
-Исправление ошибок
+Бот теперь использует базу данных вместо обычного файла для хранения данных о пользователях.
+Исправлена ошибка, из-за которой нельзя было использовать команды.
+Исправлено множество других мелких ошибок.
 """)
 
 
 @router.message(Command('version_comments'))
 async def version_comments(m: Message):
     """Подробно показать список изменений."""
-    await m.answer("""моя версия: 2.6.11.dev0 (обновление 4.0)
+    await m.answer("""моя версия: 2.6.14.dev0 (обновление 4.0)
 
-Исправление ошибок (ну как исправление. Скорее мойка кота.)
-Код упрощён и почищен, улучшен. Если более конкретно, то удалены и перемещены некоторые функции.
+Бот теперь использует базу данных вместо обычного файла для хранения данных о пользователях. (возможно увеличение производительности).
+Исправлена ошибка, из-за которой нельзя было использовать команды. (ошибка страшная, но решалась очень легко)
+Исправлено множество других мелких ошибок. (я не помню каких, а нет вспомнил одну из них.) Например, неработающее изменение четверти, используя кнопку.
 """)
 
 
@@ -338,12 +334,12 @@ async def change_password(m: Message, state: FSMContext, repo: Repo):
     data = await state.get_data()
     login = data['login']
     password = m.text
-    await m.answer('проверка введённых данных, попытка регистрации')
+    m = await m.answer('проверка введённых данных, попытка регистрации')
     await m.delete()
     jwtoken = await repo.register_user(login, password)
     await repo.update_user_token(m.from_user.id, jwtoken)
     await state.clear()
-    await m.answer('удалось зарегистрироваться, данные введены правильно. Можешь получать оценки.')
+    await m.edit_text('удалось зарегистрироваться, данные введены правильно. Можешь получать оценки.')
 
 @registered_router.callback_query(Text('change_data'), StateFilter(Page.REGISTER))
 async def change_data(query: CallbackQuery, state: FSMContext):
@@ -398,6 +394,14 @@ async def grades_one_lesson(m: Message, grades):
         await m.answer(show_grades_for_lesson(grades[lesson]), reply_markup=main_keyboard())
 
 
+@not_command_router.message(CommandFilter(True))
+async def text_is_command(message: Message):
+    """В случае, если пользователь написал команду вместо того,
+    что его попросили, будет вызываться эта функция.
+    """
+    await message.answer('по моему ты написал одну из моих команд. Тебя что попросили написать?')
+
+
 def register_user(dp: Dispatcher):
     """Настройка роутеров."""
     dp.include_router(router)
@@ -407,3 +411,4 @@ def register_user(dp: Dispatcher):
     grades_router.message.middleware(grades_middleware)
     grades_router.callback_query.middleware(grades_middleware)
     registered_router.include_router(grades_router)
+    router.include_router(not_command_router)

@@ -16,6 +16,7 @@ from tgbot.states.user import AdminState
 admin_router = Router()
 admin_router.message.filter(RoleFilter(UserRole.ADMIN))
 
+
 @admin_router.message(Command('start'))
 async def admin_start(m: Message):
     """Отдельный обработчик команды /start для админа. Остался от шаблона, не нужен, но используется."""

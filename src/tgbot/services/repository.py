@@ -69,7 +69,7 @@ class Repo:
             # print(cursor.rowcount)
             # assert cursor.rowcount == 1, 'несколько пользователей с одинаковым id'
             last_cache, quarter, jwtoken, url = await cursor.fetchone()
-            if last_cache - time.time() < 3600:
+            if time.time() - last_cache < 3600:
                 await cursor.execute('SELECT name, date, value FROM QuarterLessonMarks WHERE user_id=? AND quarter=?',
                                      (user_id, quarter))
                 cached_grades = {}
@@ -115,7 +115,7 @@ class Repo:
         quarter_grades = grades[quarter]
         await cursor.execute('UPDATE Users SET last_cache = ? WHERE id = ?', (time.time(), user_id))
         await cursor.execute('DELETE FROM QuarterLessonMarks WHERE user_id = ? AND quarter = ?', (user_id, quarter))
-        await cursor.executemany('INSERT INTO QuarterUserMarks VALUES (?, ?, ?, ?, ?)',
+        await cursor.executemany('INSERT INTO QuarterLessonMarks VALUES (?, ?, ?, ?, ?)',
                                  [(user_id, quarter, name, value['date'], value['value'])
                                   for name, values in quarter_grades.items() for value in values])
         await self.db.commit()
@@ -216,7 +216,7 @@ class ElschoolRepo:
                         for grade in lesson_grades[quarter_index].find_all('span', class_='mark-span'):
                             grades_list.append({
                                 'value': int(grade.text),
-                                'date': grade['data-popover-content'].split('<p>')
+                                'date': '\n'.join(grade['data-popover-content'].split('<p>'))
                             })
                         quarter_grades[lesson_name.text] = grades_list
                     grades[quarters[quarter_index]] = quarter_grades
