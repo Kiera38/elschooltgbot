@@ -17,18 +17,18 @@ class GradesMiddleware(BaseMiddleware):
                        data: Dict[str, Any]) -> Any:
         user: types.User = data['event_from_user']
         repo: Repo = data['repo']
-        message = event if isinstance(event, Message) else event.message
-        message = await cast(Bot, data['bot']).send_message(message.chat.id, 'получаю оценки')
+        m = event if isinstance(event, Message) else event.message
+        message = await m.answer('получаю оценки')
 
         try:
             grades, time = await repo.get_grades(user.id)
         except NoDataException:
             state: FSMContext = data['state']
             await state.set_state(Change.LOGIN)
-            await message.edit_text('Кажется, что elschool обновил некоторые данные о тебе. '
-                                    'Чтобы я смог продолжить получать оценки, я должен обновить эти данные.'
-                                    'Для этого понадобится ввести логин и пароль. Сначала логин.',
-                                    reply_markup=main_keyboard())
+            await message.answer('Кажется, что elschool обновил некоторые данные о тебе. '
+                                 'Чтобы я смог продолжить получать оценки, я должен обновить эти данные.'
+                                 'Для этого понадобится ввести логин и пароль. Сначала логин.',
+                                 reply_markup=main_keyboard())
             return
         data['grades'] = grades
         if time:

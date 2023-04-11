@@ -1,6 +1,7 @@
 """Основная логика взаимодействия с elschool."""
 import logging
 import time
+from pprint import pprint
 from typing import List
 
 import aiohttp
@@ -66,8 +67,6 @@ class Repo:
         """Получить оценки для пользователя."""
         async with self.db.cursor() as cursor:
             await cursor.execute('SELECT last_cache, quarter, jwtoken, url FROM Users WHERE id=?', (user_id,))
-            # print(cursor.rowcount)
-            # assert cursor.rowcount == 1, 'несколько пользователей с одинаковым id'
             last_cache, quarter, jwtoken, url = await cursor.fetchone()
             if time.time() - last_cache < 3600:
                 await cursor.execute('SELECT name, date, value FROM QuarterLessonMarks WHERE user_id=? AND quarter=?',
@@ -76,10 +75,12 @@ class Repo:
                 async for name, date, value in cursor:
                     if name not in cached_grades:
                         cached_grades[name] = []
-                    cached_grades[name].append({
-                        'date': date,
-                        'value': value
-                    })
+                    print(value)
+                    if value != 0:
+                        cached_grades[name].append({
+                            'date': date,
+                            'value': value
+                        })
                 return cached_grades, 0
 
             return await self._update_cache(cursor, user_id, quarter, jwtoken, url)
@@ -102,6 +103,7 @@ class Repo:
     async def clear_user_cache(self, user_id):
         await self.db.execute('DELETE FROM QuarterLessonMarks WHERE user_id = :user_id AND quarter = '
                               '  (SELECT quarter FROM Users WHERE id = :user_id)', {'user_id': user_id})
+        await self.db.execute('UPDATE Users SET last_cache = 0 WHERE id = ?', (user_id,))
         await self.db.commit()
 
     async def update_cache(self, user_id):
@@ -115,11 +117,15 @@ class Repo:
         quarter_grades = grades[quarter]
         await cursor.execute('UPDATE Users SET last_cache = ? WHERE id = ?', (time.time(), user_id))
         await cursor.execute('DELETE FROM QuarterLessonMarks WHERE user_id = ? AND quarter = ?', (user_id, quarter))
+        pprint(quarter_grades)
+        for name, values in quarter_grades.items():
+            if not values:
+                quarter_grades[name].append({'date': '--.--.----', 'value': 0})
         await cursor.executemany('INSERT INTO QuarterLessonMarks VALUES (?, ?, ?, ?, ?)',
                                  [(user_id, quarter, name, value['date'], value['value'])
                                   for name, values in quarter_grades.items() for value in values])
         await self.db.commit()
-        return quarter_grades, get_time
+        return grades[quarter], get_time
 
     async def get_quarters(self, user_id):
         async with self.db.execute('SELECT DISTINCT quarter FROM QuarterLessonMarks WHERE user_id = ?',
