@@ -75,7 +75,6 @@ class Repo:
                 async for name, date, value in cursor:
                     if name not in cached_grades:
                         cached_grades[name] = []
-                    print(value)
                     if value != 0:
                         cached_grades[name].append({
                             'date': date,
@@ -117,7 +116,6 @@ class Repo:
         quarter_grades = grades[quarter]
         await cursor.execute('UPDATE Users SET last_cache = ? WHERE id = ?', (time.time(), user_id))
         await cursor.execute('DELETE FROM QuarterLessonMarks WHERE user_id = ? AND quarter = ?', (user_id, quarter))
-        pprint(quarter_grades)
         for name, values in quarter_grades.items():
             if not values:
                 quarter_grades[name].append({'date': '--.--.----', 'value': 0})
