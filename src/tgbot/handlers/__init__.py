@@ -4,7 +4,7 @@ from aiogram import Dispatcher
 from aiogram.filters import Command, StateFilter, Text
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BotCommand, Message, CallbackQuery
-from tgbot.handlers import user, admin, errors
+from tgbot.handlers import user, admin, errors, grades
 from tgbot.keyboards.user import main_keyboard
 
 
@@ -45,5 +45,6 @@ def register_handlers(dp: Dispatcher):
     dp.message.register(cancel, Command('cancel'), StateFilter('*'))
     dp.callback_query.register(cancel_query, Text('cancel'))
     admin.register_admin(dp)
+    grades.register_handlers(dp)
     user.register_user_handlers(dp)
     errors.register_errors(dp)

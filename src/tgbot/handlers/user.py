@@ -8,16 +8,12 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup
 
 from tgbot.filters.command import CommandFilter
 from tgbot.filters.user import RegisteredUserFilter
-from tgbot.handlers.utils import show_grades, show_fix_grades, show_grades_for_lesson, lower_keys
-from tgbot.keyboards.user import main_keyboard, row_list_keyboard, grades_keyboard, pick_grades_inline_keyboard, \
-    pick_grades_keyboard, cancel_keyboard, user_agree_keyboard, settings_keyboard
-from tgbot.middlewares.grades import GradesMiddleware
+from tgbot.keyboards.user import main_keyboard, row_list_keyboard, cancel_keyboard, user_agree_keyboard, settings_keyboard
 from tgbot.services.repository import Repo
 from tgbot.states.user import Change, Page, Register
 
 router = Router()
 registered_router = Router()
-grades_router = Router()
 not_command_router = Router()
 
 
@@ -45,7 +41,6 @@ async def get_user_password(m: Message, repo: Repo, state: FSMContext):
     await state.set_state(Register.QUARTER)
     await m.answer(f'оценки получил за {time:.3f}с. Выбери какие оценки мне нужно показывать',
                    reply_markup=row_list_keyboard(quarters))
-
 
 
 @router.message(StateFilter(Register.QUARTER), CommandFilter())
@@ -112,72 +107,6 @@ async def exit_user(query: CallbackQuery, state: FSMContext):
     await query.message.answer('ну и не пользуйся, раз не согласен.', reply_markup=main_keyboard())
 
 
-@registered_router.message(Text('оценки'))
-async def grades(m: Message, state: FSMContext):
-    """Показывает страницу оценок клавиатуры"""
-    await state.set_state(Page.GRADES)
-    await m.answer('выбери действие', reply_markup=grades_keyboard())
-
-
-async def grades_query(query: CallbackQuery, repo: Repo, state: FSMContext, next_state, answer_text: str):
-    """Вспомогательная функция для обработки действий со страницы оценок."""
-    lessons = await repo.get_user_lessons(query.from_user.id)
-    await state.set_state(next_state)
-    await query.message.edit_reply_markup(pick_grades_inline_keyboard())
-    message = await query.message.answer(answer_text, reply_markup=pick_grades_keyboard(lessons=lessons))
-    await state.update_data(grades_message=message)
-
-
-@registered_router.callback_query(Text('get_grades'), StateFilter(Page.GRADES))
-async def get_grades_query(query: CallbackQuery, repo: Repo, state: FSMContext):
-    """Когда пользователь выбрал показать оценки на станице оценок клавиатуры."""
-    await grades_query(query, repo, state, Page.GET_GRADES, 'какие оценки показать')
-
-
-@registered_router.callback_query(Text('fix_grades'), StateFilter(Page.GRADES))
-async def fix_grades_query(query: CallbackQuery, repo: Repo, state: FSMContext):
-    """Когда пользователь выбрал исправить оценки на странице оценок клавиатуры."""
-    await grades_query(query, repo, state, Page.FIX_GRADES, 'какие оценки исправить')
-
-
-@grades_router.message(Command('get_grades'))
-async def get_grades(m: Message, grades):
-    """Обработчик для команды показа оценок, но также функция для показа оценок."""
-    await m.answer(show_grades(grades), reply_markup=main_keyboard())
-
-
-@grades_router.callback_query(Text('all_grades'), StateFilter(Page.GET_GRADES))
-async def get_all_grades(query: CallbackQuery, grades: dict, state: FSMContext):
-    """Когда пользователь выбрал показать все оценки на клавиатуре."""
-    await get_grades(query.message, grades)
-    await state.clear()
-
-
-@grades_router.message(StateFilter(Page.GET_GRADES))
-async def keyboard_get_grades(m: Message, grades: dict, state: FSMContext):
-    """Когда пользователь выбрал показать оценки по конкретному уроку."""
-    await grades_one_lesson(m, grades)
-    await state.clear()
-
-
-@grades_router.message(StateFilter(Page.FIX_GRADES))
-async def keyboard_fix_grades(m: Message, grades: dict, state: FSMContext):
-    """Когда пользователь выбрал исправить оценки по конкретному уроку."""
-    if m.text == 'все':
-        await fix_grades(m, grades)
-    else:
-        grades = lower_keys(grades)
-        lesson = m.text.lower()
-        if lesson not in grades:
-            await m.answer(f'кажется, тебе хотелось не этого получить. '
-                           f'Если что, мне показалось, что ты хочешь получить оценки для {lesson}. '
-                           f'Такого названия урока нет. Если хотел сделать что-то другое можешь обратится к моему разработчику.'
-                           f'Он может добавить нужную функцию.')
-            return
-        await m.answer(show_grades_for_lesson(grades[lesson]), reply_markup=main_keyboard())
-    await state.clear()
-
-
 @registered_router.message(Command('clear_cache'))
 async def clear_cache(m: Message, repo: Repo):
     """Очистка сохранённых оценок."""
@@ -191,18 +120,6 @@ async def update_cache(m: Message, repo: Repo):
     await m.answer('обновляю сохранённые оценки')
     _, time = await repo.update_cache(m.from_user.id)
     await m.answer(f'оценки обновлены за {time: .3f} с')
-
-
-@registered_router.callback_query(Text('back_grades'))
-async def back_grades(query: CallbackQuery, state: FSMContext):
-    """Обработка кнопки назад для возврата к странице оценок."""
-    await state.set_state(Page.GRADES)
-    await query.message.edit_reply_markup(grades_keyboard(True))
-    data = await state.get_data()
-    message: Message = data.get('grades_message')
-    if message:
-        await message.delete()
-    await query.answer()
 
 
 @registered_router.callback_query(Text('back_main'))
@@ -219,20 +136,6 @@ async def user_start(m: Message):
     """При старте бота показать приветственное сообщение."""
     await m.reply("привет, я могу присылать тебе оценки из электронного журнала elschool и подсказывать как их испавить\n"
                   "чтобы узнать как пользоваться используй /help", reply_markup=main_keyboard())
-
-
-@grades_router.message(Command('fix_grades'))
-async def fix_grades(m: Message, grades):
-    """Обработка команды исправления оценок и функция для показа сообщения исправления оценок."""
-    await m.answer(show_fix_grades(grades), reply_markup=main_keyboard())
-
-
-@grades_router.callback_query(Text('all_grades'), StateFilter(Page.FIX_GRADES))
-async def fix_all_grades(query: CallbackQuery, grades: dict, state: FSMContext):
-    """Обработка кнопки исправления всех оценок."""
-    await fix_grades(query.message, grades)
-    await state.clear()
-    await query.answer()
 
 
 @router.message(Text('настройки'))
@@ -393,23 +296,6 @@ async def no_user(m: Message):
     await m.answer('тебя нет в списке пользователей, попробуй зарегистрироваться')
 
 
-@grades_router.message(CommandFilter())
-async def grades_one_lesson(m: Message, grades):
-    """Показать оценки для одного урока."""
-    if m.text == 'все':
-        await get_grades(m, grades)
-    else:
-        grades = lower_keys(grades)
-        lesson = m.text.lower()
-        if lesson not in grades:
-            await m.answer(f'кажется, тебе хотелось не этого получить. '
-                           f'Если что, мне показалось, что ты хочешь получить оценки для {lesson}. '
-                           f'Такого названия урока нет. Если хотел сделать что-то другое можешь обратится к моему разработчику.'
-                           f'Он может добавить нужную функцию.')
-            return
-        await m.answer(show_grades_for_lesson(grades[lesson]), reply_markup=main_keyboard())
-
-
 @not_command_router.message(CommandFilter(True))
 async def text_is_command(message: Message):
     """В случае, если пользователь написал команду вместо того,
@@ -423,8 +309,4 @@ def register_user_handlers(dp: Dispatcher):
     dp.include_router(router)
     registered_router.message.filter(RegisteredUserFilter(True))
     router.include_router(registered_router)
-    grades_middleware = GradesMiddleware()
-    grades_router.message.middleware(grades_middleware)
-    grades_router.callback_query.middleware(grades_middleware)
-    registered_router.include_router(grades_router)
     router.include_router(not_command_router)

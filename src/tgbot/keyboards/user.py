@@ -1,4 +1,7 @@
 """Клавиатуры для пользователя."""
+import calendar
+import datetime
+
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 
 
@@ -10,42 +13,104 @@ def main_keyboard():
     ], resize_keyboard=True)
 
 
-def grades_keyboard(show_back=False):
+def grades_keyboard(all=False, pick=False, summary=False, detail=False, lesson_date=False, date=False,
+                    five=False, four=False, three=False, two=False):
     """Клавиатура для страницы оценки."""
-    keyboard = [
-        [InlineKeyboardButton(text='получить', callback_data='get_grades')],
-        [InlineKeyboardButton(text='исправить', callback_data='fix_grades')],
-    ]
-    if show_back:
-        keyboard.append([InlineKeyboardButton(text='назад', callback_data='back_main')])
-    return InlineKeyboardMarkup(inline_keyboard=keyboard)
-
-
-def pick_grades_keyboard(lessons=()):
-    """Клавиатура для выбора конкретного урока."""
-    buttons = []
-
-    if not lessons:
-        return None
-    if len(lessons) == 1:
-        buttons.append([KeyboardButton(text=lessons[0])])
-        return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
-    if len(lessons) < 10:
-        for lesson in lessons:
-            buttons.append([KeyboardButton(text=lesson)])
-        return ReplyKeyboardMarkup(keyboard=buttons)
-    for lesson1, lesson2 in zip(lessons[::2], lessons[1::2]):
-        buttons.append([KeyboardButton(text=lesson1), KeyboardButton(text=lesson2)])
-    return ReplyKeyboardMarkup(keyboard=buttons)
-
-
-def pick_grades_inline_keyboard():
-    """Inline клавиатура, которая показывается при выборе конкретного урока."""
+    all_key = '✓ все' if all else 'все'
+    pick_key = '✓ выбрать из списка' if pick else 'выбрать из списка'
+    summary_key = '✓ кратко' if summary else 'кратко'
+    detail_key = '✓ подробно' if detail else 'подробно'
+    lesson_date_key = '✓ дата оценки' if lesson_date else 'дата оценки'
+    date_key = '✓ дата проставления' if date else 'дата проставления'
+    five_key = '✓ 5' if five else '5'
+    four_key = '✓ 4' if four else '4'
+    three_key = '✓ 3' if three else '3'
+    two_key = '✓ 2' if two else '2'
+    if summary:
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text='показать', callback_data='show')],
+            [InlineKeyboardButton(text=summary_key, callback_data='summary'),
+             InlineKeyboardButton(text=detail_key, cllback_data='detail')],
+            [InlineKeyboardButton(text=five_key, callback_data='5'),
+             InlineKeyboardButton(text=four_key, callback_data='4'),
+             InlineKeyboardButton(text=three_key, callback_data='3'),
+             InlineKeyboardButton(text=two_key, callback_data='2')]
+        ])
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='все', callback_data='all_grades')],
-        [InlineKeyboardButton(text='назад', callback_data='back_grades'),
+        [InlineKeyboardButton(text='показать', callback_data='show')],
+        [InlineKeyboardButton(text=all_key, callback_data='all'),
+         InlineKeyboardButton(text=pick_key, callback_data='pick')],
+        [InlineKeyboardButton(text=summary_key, callback_data='summary'),
+         InlineKeyboardButton(text=detail_key, cllback_data='detail')],
+        [InlineKeyboardButton(text=lesson_date_key, callback_data='lesson_date'),
+         InlineKeyboardButton(text=date_key, callback_data='date')],
+        [InlineKeyboardButton(text=five_key, callback_data='5'), InlineKeyboardButton(text=four_key, callback_data='4'),
+         InlineKeyboardButton(text=three_key, callback_data='3'), InlineKeyboardButton(text=two_key, callback_data='2')]
+    ])
+
+
+def pick_grades_keyboard(lessons):
+    """Inline клавиатура, которая показывается при выборе конкретного урока."""
+    buttons = [[InlineKeyboardButton(text=f'✓ {lesson1}' if picked1 else lesson1, callback_data=lesson1),
+                InlineKeyboardButton(text=f'✓ {lesson2}' if picked2 else lesson2, callback_data=lesson2)]
+               for (picked1, lesson1), (picked2, lesson2) in zip(lessons[::2], lessons[1::2])]
+    return InlineKeyboardMarkup(inline_keyboard=[
+        *buttons,
+        [InlineKeyboardButton(text='назад', callback_data='back'),
          InlineKeyboardButton(text='отмена', callback_data='cancel')]
     ])
+
+
+month_names = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
+               'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь']
+
+def pick_day_keyboard(year, month, picked_dates=(), current_week=False, current_month=False):
+    month_calendar = calendar.monthcalendar(year, month)
+    buttons = [
+        [InlineKeyboardButton(text=f'✓ {day}' if datetime.date(year, month, day) in picked_dates else str(day),
+                              callback_data=f'day{year}.{month}.{day}') for day in week] for week in month_calendar
+    ]
+    current_week_key = '✓ текущая неделя' if current_week else 'текущая неделя'
+    current_month_key = '✓ текущий месяц' if current_month else 'текущий месяц'
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='<<', callback_data='prev_month'),
+         InlineKeyboardButton(text=f'{month_names[month]} {year}', callback_data='pick_month'),
+         InlineKeyboardButton(text='>>', callback_data='next_month')],
+        [InlineKeyboardButton(text=current_week_key, callback_data='current_week'),
+         InlineKeyboardButton(text=current_month_key, callback_data='current_month')],
+        *buttons,
+        [InlineKeyboardButton(text='назад', callback_data='back'),
+         InlineKeyboardButton(text='отмена', callback_data='cancel')]
+    ])
+
+
+def pick_month_keyboard(year, picked_month):
+    months = month_names.copy()
+    months[picked_month] = f'✓ {months[picked_month]}'
+
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='<<', callback_data='prev_year'),
+         InlineKeyboardButton(text=str(year), callback_data='pick_year'),
+         InlineKeyboardButton(text='>>', callback_data='next_year')],
+        [InlineKeyboardButton(text=months[0], callback_data='january'),
+         InlineKeyboardButton(text=months[1], callback_data='february'),
+         InlineKeyboardButton(text=months[2], callback_data='march'),
+         InlineKeyboardButton(text=months[3], callback_data='april')],
+        [InlineKeyboardButton(text=months[4], callback_data='may'),
+         InlineKeyboardButton(text=months[5], callback_data='june'),
+         InlineKeyboardButton(text=months[6], callback_data='july'),
+         InlineKeyboardButton(text=months[7], callback_data='august')],
+        [InlineKeyboardButton(text=months[8], callback_data='september'),
+         InlineKeyboardButton(text=months[9], callback_data='october'),
+         InlineKeyboardButton(text=months[10], callback_data='november'),
+         InlineKeyboardButton(text=months[11], callback_data='december')]
+    ])
+
+
+def pick_year_keyboard(year):
+    buttons = [[InlineKeyboardButton(text=str(row_year), callback_data=f'year{row_year}')
+                for row_year in range(column_year-1, column_year+2)] for column_year in range(year-4, year+5, 3)]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def cancel_keyboard():
@@ -80,3 +145,5 @@ def user_agree_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text='да', callback_data='yes'), InlineKeyboardButton(text='нет', callback_data='no')]
     ])
+
+
