@@ -4,9 +4,11 @@ from aiogram.fsm.state import StatesGroup, State
 
 class Register(StatesGroup):
     """Состояния, используемые при регистрации."""
+    SHOW_PRIVACY_POLICY = State()
     LOGIN = State()
     PASSWORD = State()
     QUARTER = State()
+    SAVE_DATA = State()
 
 
 class Change(StatesGroup):
@@ -22,6 +24,7 @@ class Page(StatesGroup):
     GET_GRADES = State()
     FIX_GRADES = State()
     REGISTER = State()
+    SETTINGS = State()
 
 
 class AdminState(StatesGroup):

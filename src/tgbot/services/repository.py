@@ -8,7 +8,7 @@ import aiohttp
 import aiosqlite
 from bs4 import BeautifulSoup
 
-from tgbot.models.user import User
+from tgbot.models.user import User, UserRole
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +19,12 @@ class Repo:
         self.db = db
         self.elschool_repo = ElschoolRepo()
 
-    async def add_user(self, user_id, user: User) -> None:
+    async def add_user(self, user_id, jwtoken, quarter, role=UserRole.USER, url='',
+                       last_cache=0, login=None, password=None) -> None:
         """Добавить нового пользователя."""
-        async with self.db.execute('INSERT INTO Users VALUES (?, ?, ?, ?, ?, ?)',
-                                   (user_id, user.jwtoken, user.quarter, user.role.value, user.url, user.last_cache)):
-            logger.info(f'пользователь добавлен {user}')
+        async with self.db.execute('INSERT INTO Users VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                                   (user_id, jwtoken, quarter, role.value, url, last_cache, login, password)):
+            logger.info(f'пользователь добавлен {(user_id, jwtoken, quarter, role, url, last_cache, login, password)}')
         await self.db.commit()
 
     async def list_users(self) -> List[User]:
@@ -67,7 +68,10 @@ class Repo:
         """Получить оценки для пользователя."""
         async with self.db.cursor() as cursor:
             await cursor.execute('SELECT last_cache, quarter, jwtoken, url FROM Users WHERE id=?', (user_id,))
-            last_cache, quarter, jwtoken, url = await cursor.fetchone()
+            if data := await cursor.fetchone():
+                last_cache, quarter, jwtoken, url = data
+            else:
+                raise NoUserException('такого пользователя не существует')
             if time.time() - last_cache < 3600:
                 await cursor.execute('SELECT name, date, value FROM QuarterLessonMarks WHERE user_id=? AND quarter=?',
                                      (user_id, quarter))
@@ -91,7 +95,7 @@ class Repo:
 
     async def update_user_token(self, user_id, jwtoken):
         await self.db.execute('UPDATE Users SET jwtoken = ?, last_cache = 0 WHERE id = ?',
-                                   (jwtoken, user_id))
+                              (jwtoken, user_id))
         await self.db.commit()
 
     async def check_has_user(self, user_id):
@@ -109,16 +113,17 @@ class Repo:
         async with self.db.cursor() as cursor:
             await cursor.execute('SELECT quarter, jwtoken, url FROM Users WHERE id=?', (user_id,))
             quarter, jwtoken, url = await cursor.fetchone()
-            return await self._update_cache(cursor, user_id, quarter, jwtoken, url)
+            return await self._update_cache(cursor, user_id, quarter, jwtoken, url)      
 
     async def _update_cache(self, cursor, user_id, quarter, jwtoken, url):
         grades, get_time, url = await self.get_grades_userdata(jwtoken, url)
-        quarter_grades = grades[quarter]
+        quarter_grades = {}
         await cursor.execute('UPDATE Users SET last_cache = ? WHERE id = ?', (time.time(), user_id))
         await cursor.execute('DELETE FROM QuarterLessonMarks WHERE user_id = ? AND quarter = ?', (user_id, quarter))
-        for name, values in quarter_grades.items():
+        for name, values in grades[quarter].items():
             if not values:
-                quarter_grades[name].append({'date': '--.--.----', 'value': 0})
+                values = [{'date': '', 'value': 0}]
+            quarter_grades[name] = values
         await cursor.executemany('INSERT INTO QuarterLessonMarks VALUES (?, ?, ?, ?, ?)',
                                  [(user_id, quarter, name, value['date'], value['value'])
                                   for name, values in quarter_grades.items() for value in values])
@@ -138,6 +143,10 @@ class Repo:
         async with self.db.execute('SELECT DISTINCT name FROM QuarterLessonMarks WHERE user_id = :user_id AND quarter = '
                                    '    (SELECT quarter FROM Users WHERE id = :user_id)', {'user_id': user_id}) as cursor:
             return [row[0] async for row in cursor]
+
+    async def get_user_data(self, user_id):
+        async with self.db.execute('SELECT login, password FROM Users WHERE id = ?', (user_id,)) as cursor:
+            return await cursor.fetchone()
 
 
 
@@ -239,4 +248,8 @@ class NotRegisteredException(Exception):
 
 class NoDataException(Exception):
     """Исключение, сообщающее о том, что не удалось получить некоторые данные с сервера."""
+    pass
+
+
+class NoUserException(Exception):
     pass

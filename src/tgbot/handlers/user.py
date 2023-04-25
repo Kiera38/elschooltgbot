@@ -1,16 +1,17 @@
 """Обработка основных событий, совершённых пользователем."""
+from typing import Union
+
 from aiogram import Router, Dispatcher
 from aiogram.filters import StateFilter, Command, Text
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup
 
 from tgbot.filters.command import CommandFilter
 from tgbot.filters.user import RegisteredUserFilter
 from tgbot.handlers.utils import show_grades, show_fix_grades, show_grades_for_lesson, lower_keys
 from tgbot.keyboards.user import main_keyboard, row_list_keyboard, grades_keyboard, pick_grades_inline_keyboard, \
-    pick_grades_keyboard, register_keyboard, cancel_keyboard
+    pick_grades_keyboard, register_keyboard, cancel_keyboard, user_agree_keyboard, settings_keyboard
 from tgbot.middlewares.grades import GradesMiddleware
-from tgbot.models.user import User
 from tgbot.services.repository import Repo
 from tgbot.states.user import Change, Page, Register
 
@@ -36,54 +37,79 @@ async def get_user_password(m: Message, repo: Repo, state: FSMContext):
     data = await state.get_data()
     await m.answer('проверка введённых данных, попытка регистрации')
     jwtoken = await repo.register_user(data['login'], m.text)
-    await state.update_data(jwtoken=jwtoken)
+    await state.update_data(jwtoken=jwtoken, password=m.text)
     await m.answer('удалось зарегистрироваться, данные введены правильно, теперь попробую получить оценки')
     grades, time, url = await repo.get_grades_userdata(jwtoken)
     quarters = list(grades)
     await state.update_data(url=url, quarters=list(grades.keys()))
     await state.set_state(Register.QUARTER)
-    await m.answer(f'оценки получил за {time:.3f}с. Выбери какие оценки мне нужно показывать', reply_markup=row_list_keyboard(quarters))
+    await m.answer(f'оценки получил за {time:.3f}с. Выбери какие оценки мне нужно показывать',
+                   reply_markup=row_list_keyboard(quarters))
 
 
 
 @router.message(StateFilter(Register.QUARTER), CommandFilter())
-async def get_user_quarter(m: Message, repo: Repo, state: FSMContext):
+async def get_user_quarter(m: Message, state: FSMContext):
     """Когда пользователь при регистрации указал четверть, вызывается эта функция."""
     data = await state.get_data()
     if m.text in data['quarters']:
-        quarter = m.text
+        await state.update_data(quarter=m.text)
+        await state.set_state(Register.SAVE_DATA)
+        await m.answer('регистрация завершена, но я спрошу ещё кое-что. Стоит ли мне сохранять логин и пароль, '
+                       'чтобы когда elschool обновил некоторые данные, я мог их тоже обновить.'
+                       'Обычно, это происходит раз в неделю. Ты всегда сможешь изменить это в настройках.',
+                       reply_markup=user_agree_keyboard())
+        await m.delete()
     else:
         quarters = list(data['quarters'].keys())
         await m.answer(f'тут немного не правильно написано, попробуй ещё раз', reply_markup=row_list_keyboard(quarters))
         return
-    await repo.add_user(m.from_user.id, User(data['jwtoken'], quarter, url=data['url']))
-    await m.answer('регистрация завершена, теперь можешь получать оценки', reply_markup=main_keyboard())
-    await m.delete()
+
+
+@router.callback_query(StateFilter(Register.SAVE_DATA), Text('yes'))
+async def save_user_data(query: CallbackQuery, state: FSMContext, repo: Repo):
+    await query.message.answer('хорошо, я сохраню.', reply_markup=main_keyboard())
+    data = await state.get_data()
+    await repo.add_user(query.from_user.id, data['jwtoken'], data['quarter'],
+                        url=data['url'], login=data['login'], password=data['password'])
+    await state.clear()
+
+
+@router.callback_query(StateFilter(Register.SAVE_DATA), Text('no'))
+async def no_save_user_data(query: CallbackQuery, state: FSMContext, repo: Repo):
+    await query.message.answer('я не буду сохранять логин и пароль. '
+                               'При обновлениях данных я буду их спрашивать у тебя.', reply_markup=main_keyboard())
+    data = await state.get_data()
+    await repo.add_user(query.from_user.id, data['jwtoken'], data['quarter'], url=data['url'])
     await state.clear()
 
 
 @router.message(Command('register'))
-async def register(m: Message, state: FSMContext):
-    """Когда пользователь захотел зарегистрироваться."""
+@router.callback_query(Text('register'), StateFilter(Page.SETTINGS))
+async def register_user(message_or_query: Union[Message, CallbackQuery], state: FSMContext):
+    """Регистрация """
+    if isinstance(message_or_query, CallbackQuery):
+        await message_or_query.message.edit_reply_markup(cancel_keyboard())
+        await message_or_query.answer()
+        message = message_or_query.message
+    else:
+        message = message_or_query
+    await state.set_state(Register.SHOW_PRIVACY_POLICY)
+    await message.answer('надеюсь, ты согласен с политикой конфиденциальности.', reply_markup=user_agree_keyboard())
+    await privacy_policy(message, state)
+
+
+@router.callback_query(StateFilter(Register.SHOW_PRIVACY_POLICY), Text('yes'))
+async def register_login(query: CallbackQuery, state: FSMContext):
     await state.set_state(Register.LOGIN)
-    await m.answer('сейчас нужно ввести свои данные, сначала логин')
+    await query.message.edit_text('ну вот хорошо. Для начала введи логин.',
+                                  reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
 
 
-@router.message(Text('регистрация'))
-async def keyboard_register(m: Message, state: FSMContext, repo: Repo):
-    """Показывает страницу регистрации клавиатуры."""
-    await state.set_state(Page.REGISTER)
-    await state.update_data(message=m)
-    await m.answer('выбери действие', reply_markup=register_keyboard(await repo.check_has_user(m.from_user.id)))
-
-
-@router.callback_query(Text('register'), StateFilter(Page.REGISTER))
-async def keybard_register_user(query: CallbackQuery, state: FSMContext):
-    """Регистрация из клавиатуры."""
-    await query.message.edit_reply_markup(cancel_keyboard())
-    data = await state.get_data()
-    await register(data['message'], state)
-    await query.answer()
+@router.callback_query(StateFilter(Register.SHOW_PRIVACY_POLICY), Text('no'))
+async def exit_user(query: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await query.message.answer('ну и не пользуйся, раз не согласен.', reply_markup=main_keyboard())
 
 
 @registered_router.message(Text('оценки'))
@@ -97,7 +123,6 @@ async def grades_query(query: CallbackQuery, repo: Repo, state: FSMContext, next
     """Вспомогательная функция для обработки действий со страницы оценок."""
     lessons = await repo.get_user_lessons(query.from_user.id)
     await state.set_state(next_state)
-    await query.answer()
     await query.message.edit_reply_markup(pick_grades_inline_keyboard())
     message = await query.message.answer(answer_text, reply_markup=pick_grades_keyboard(lessons=lessons))
     await state.update_data(grades_message=message)
@@ -126,7 +151,6 @@ async def get_all_grades(query: CallbackQuery, grades: dict, state: FSMContext):
     """Когда пользователь выбрал показать все оценки на клавиатуре."""
     await get_grades(query.message, grades)
     await state.clear()
-    await query.answer()
 
 
 @grades_router.message(StateFilter(Page.GET_GRADES))
@@ -211,22 +235,33 @@ async def fix_all_grades(query: CallbackQuery, grades: dict, state: FSMContext):
     await query.answer()
 
 
+@router.message(Text('настройки'))
+async def settings(message: Message, state: FSMContext, repo: Repo):
+    await state.set_state(Page.SETTINGS)
+    await message.answer('настройки', reply_markup=settings_keyboard(await repo.check_has_user(message.from_user.id)))
+
+
 @router.message(Command('version'))
-@router.message(Text('версия'))
-async def version(m: Message):
+@router.callback_query(Text('version'), StateFilter(Page.SETTINGS))
+async def version(message_or_query: Union[Message, CallbackQuery]):
     """Показать версию и список изменений."""
-    await m.answer("""моя версия: 2.6.14.dev0 (обновление 4.0)
+    if isinstance(message_or_query, CallbackQuery):
+        await message_or_query.answer()
+        message = message_or_query.message
+    else:
+        message = message_or_query
+    await message.answer("""моя версия: 2.6.23.dev1 (обновление 4.0)
 список изменений:
 Бот теперь использует базу данных вместо обычного файла для хранения данных о пользователях.
 Исправлена ошибка, из-за которой нельзя было использовать команды.
 Исправлено множество других мелких ошибок.
-""")
+""", reply_markup=main_keyboard())
 
 
 @router.message(Command('version_comments'))
 async def version_comments(m: Message):
     """Подробно показать список изменений."""
-    await m.answer("""моя версия: 2.6.14.dev0 (обновление 4.0)
+    await m.answer("""моя версия: 2.6.23.dev1 (обновление 4.0)
 
 Бот теперь использует базу данных вместо обычного файла для хранения данных о пользователях. (возможно увеличение производительности).
 Исправлена ошибка, из-за которой нельзя было использовать команды. (ошибка страшная, но решалась очень легко)
@@ -272,51 +307,29 @@ async def quarter_changed(m: Message, state: FSMContext, repo: Repo):
     await m.answer('изменил', reply_markup=main_keyboard())
 
 
-async def change_quarter(m: Message, user_id: int, state: FSMContext, repo: Repo):
-    """Пользователь захотел изменить четверть."""
-    await state.set_state(Change.QUARTER)
-    quarters = await repo.get_quarters(user_id)
-    await m.answer(f'выбери вариант', reply_markup=row_list_keyboard(quarters))
-
-
-@registered_router.message(Command('change_quarter'), CommandFilter())
-async def change_quarter_command(m: Message, repo: Repo, state: FSMContext):
+@registered_router.message(Command('change_quarter'))
+@registered_router.callback_query(Text('change_quarter'), StateFilter(Page.SETTINGS))
+async def change_quarter(message_or_query: Union[Message, CallbackQuery], repo: Repo, state: FSMContext):
     """Пользователь захотел изменить четверть из клавиатуры."""
-    await change_quarter(m, m.from_user.id, state, repo)
-
-
-@registered_router.callback_query(Text('change_quarter'))
-async def change_quarter_query(query: CallbackQuery, state: FSMContext, repo: Repo):
-    """Пользователь захотел изменить четверть с помощью команды."""
-    await change_quarter(query.message, query.from_user.id, state, repo)
-    await query.answer()
+    message = message_or_query.message if isinstance(message_or_query, CallbackQuery) else message_or_query
+    await state.set_state(Change.QUARTER)
+    quarters = await repo.get_quarters(message_or_query.from_user.id)
+    await message.answer(f'выбери вариант', reply_markup=row_list_keyboard(quarters))
 
 
 @router.message(Command('privacy_policy'))
-async def privacy_policy(m: Message):
+@router.callback_query(Text('privacy_policy'), StateFilter(Page.SETTINGS))
+async def privacy_policy(message_or_query: Union[Message, CallbackQuery], state: FSMContext):
     """Показать политику конфиденциальности."""
-    await m.answer('это что-то похожее на политику конфиденциальности. '
-                   'Если кто-то напишет нормальную политику конфиденциальности, я её обновлю.')
-    await m.answer("Для получения оценок бот просит логин и пароль от журнала elschool. "
-                   "Эти данные используются только для получения токена. "
-                   "Этот токен используется для получения оценок. Никак ваши данные из него получить нельзя", reply_markup=main_keyboard())
-
-
-@router.callback_query(Text('privacy_policy'), StateFilter(Page.REGISTER))
-async def privacy_policy_query(query: CallbackQuery, state: FSMContext):
-    await privacy_policy(query.message)
-    await query.answer()
-    await state.clear()
-
-
-@registered_router.message(Command('reregister'))
-async def reregister(m: Message, state: FSMContext):
-    """Пользователь захотел изменить данные.
-
-    Это обработчик для команды и вспомогательная функция при использовании клавиатуры.
-    """
-    await m.answer('сейчас можно изменить свой логин и пароль, сначала введи новый логин')
-    await state.set_state(Change.LOGIN)
+    message = message_or_query.message if isinstance(message_or_query, CallbackQuery) else message_or_query
+    await message.answer("Для получения оценок бот просит логин и пароль от журнала elschool. "
+                         "Эти данные используются только для получения токена. "
+                         "Этот токен используется для получения оценок. Никак ваши данные из него получить нельзя."
+                         "Есть возможность сохранить данные от аккаунта elschool. "
+                         "Разработчик гарантирует, что данные никто смотреть не будет.",
+                         reply_markup=main_keyboard())
+    if isinstance(message_or_query, CallbackQuery):
+        await state.clear()
 
 
 @registered_router.message(StateFilter(Change.LOGIN), CommandFilter())
@@ -334,38 +347,41 @@ async def change_password(m: Message, state: FSMContext, repo: Repo):
     data = await state.get_data()
     login = data['login']
     password = m.text
-    m = await m.answer('проверка введённых данных, попытка регистрации')
+    answer_message = await m.answer('проверка введённых данных, попытка регистрации')
     await m.delete()
     jwtoken = await repo.register_user(login, password)
     await repo.update_user_token(m.from_user.id, jwtoken)
     await state.clear()
-    await m.edit_text('удалось зарегистрироваться, данные введены правильно. Можешь получать оценки.')
+    await answer_message.edit_text('удалось зарегистрироваться, данные введены правильно. Попробую получить оценки')
+    grades, time = await repo.get_grades(m.from_user.id)
+    await answer_message.edit_text(f'удалось получить оценки за {time:.3f} секунд.')
 
-@registered_router.callback_query(Text('change_data'), StateFilter(Page.REGISTER))
-async def change_data(query: CallbackQuery, state: FSMContext):
+
+
+@registered_router.message(Command('change_data'))
+@registered_router.callback_query(Text('change_data'), StateFilter(Page.SETTINGS))
+async def change_data(message_or_query: Union[Message, CallbackQuery], state: FSMContext):
     """Пользователь захотел изменить данные с помощью кнопки на клавиатуре."""
-    await query.message.edit_reply_markup(cancel_keyboard())
-    data = await state.get_data()
-    await reregister(data['message'], state)
-    await query.answer()
-
-@registered_router.message(Command('unregister'))
-async def unregister(m: Message, repo: Repo):
-    """Пользователь захотел изменить данные.
-
-    Как всегда, это обработчик для команды и вспомогательная
-    функция при обработке события нажатия кнопки.
-    """
-    await repo.remove_user(m.from_user.id)
-    await m.answer('я тебя удалил.', reply_markup=main_keyboard())
+    if isinstance(message_or_query, CallbackQuery):
+        await message_or_query.message.edit_reply_markup(cancel_keyboard())
+        message = message_or_query.message
+    else:
+        message = message_or_query
+    await message.answer('сейчас можно изменить свой логин и пароль, сначала введи новый логин')
+    await state.set_state(Change.LOGIN)
 
 
-@registered_router.callback_query(Text('remove_data'), StateFilter(Page.REGISTER))
-async def remove_data(query: CallbackQuery, repo: Repo, state: FSMContext):
+@registered_router.message(Command('remove_data'))
+@registered_router.callback_query(Text('remove_data'), StateFilter(Page.SETTINGS))
+async def remove_data(message_or_query: CallbackQuery, repo: Repo, state: FSMContext):
     """Пользователь захотел изменить данные с помощью кнопки на клавиатуре."""
-    await query.message.edit_reply_markup(cancel_keyboard())
-    data = await state.get_data()
-    await unregister(data['message'], repo)
+    if isinstance(message_or_query, CallbackQuery):
+        await message_or_query.message.edit_reply_markup(cancel_keyboard())
+        message = message_or_query.message
+    else:
+        message = message_or_query
+    await repo.remove_user(message_or_query.from_user.id)
+    await message.answer('я тебя удалил.', reply_markup=main_keyboard())
     await state.clear()
 
 
@@ -377,7 +393,7 @@ async def no_user(m: Message):
     await m.answer('тебя нет в списке пользователей, попробуй зарегистрироваться')
 
 
-@grades_router.message()
+@grades_router.message(CommandFilter())
 async def grades_one_lesson(m: Message, grades):
     """Показать оценки для одного урока."""
     if m.text == 'все':
@@ -402,7 +418,7 @@ async def text_is_command(message: Message):
     await message.answer('по моему ты написал одну из моих команд. Тебя что попросили написать?')
 
 
-def register_user(dp: Dispatcher):
+def register_user_handlers(dp: Dispatcher):
     """Настройка роутеров."""
     dp.include_router(router)
     registered_router.message.filter(RegisteredUserFilter(True))

@@ -45,5 +45,5 @@ def register_handlers(dp: Dispatcher):
     dp.message.register(cancel, Command('cancel'), StateFilter('*'))
     dp.callback_query.register(cancel_query, Text('cancel'))
     admin.register_admin(dp)
-    user.register_user(dp)
+    user.register_user_handlers(dp)
     errors.register_errors(dp)

@@ -23,14 +23,27 @@ class GradesMiddleware(BaseMiddleware):
         try:
             grades, time = await repo.get_grades(user.id)
         except NoDataException:
-            state: FSMContext = data['state']
-            await state.set_state(Change.LOGIN)
-            await message.answer('Кажется, что elschool обновил некоторые данные о тебе. '
-                                 'Чтобы я смог продолжить получать оценки, я должен обновить эти данные.'
-                                 'Для этого понадобится ввести логин и пароль. Сначала логин.',
-                                 reply_markup=main_keyboard())
-            return
+            login, password = await data['repo'].get_user_data(user.id)
+            if login is not None and password is not None:
+                repo = data['repo']
+                await message.edit_text('мне не удалось получить оценки из elschool. '
+                                        'Скорее всего, это произошло из-за того, что elschool обновил данные. '
+                                        'Так-как ты сохранил логин и пароль я их обновлю.')
+                jwtoken = await repo.register_user(login, password)
+                await repo.update_user_token(user.id, jwtoken)
+                grades, time = await repo.get_grades(user.id)
+                await message.edit_text(f'получилось обновить данные и заново получить оценки. '
+                                        f'Оценки получил за {time: .3f}')
+            else:
+                state: FSMContext = data['state']
+                await state.set_state(Change.LOGIN)
+                await message.answer('Кажется, что elschool обновил некоторые данные о тебе. '
+                                     'Чтобы я смог продолжить получать оценки, я должен обновить эти данные.'
+                                     'Для этого понадобится ввести логин и пароль. Сначала логин.',
+                                     reply_markup=main_keyboard())
+                return
+        else:
+            if time:
+                await message.edit_text(f'оценки получил за {time: .3f}')
         data['grades'] = grades
-        if time:
-            await message.edit_text(f'оценки получил за {time: .3f}')
         return await handler(event, data)

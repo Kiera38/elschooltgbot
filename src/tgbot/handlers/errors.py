@@ -11,7 +11,7 @@ from aiogram import html
 import aiogram.utils.markdown as fmt
 
 from tgbot import handlers
-from tgbot.services.repository import NotRegisteredException, NoDataException
+from tgbot.services.repository import NotRegisteredException, NoDataException, NoUserException
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,13 @@ async def timeout(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMContext)
     await message.answer('Действие выполнялось слишком долго, из-за этого произошла ошибка.'
                          'Возможно, это могло произойти из-за плохого подключения к серверу elschool.'
                          'Как вариант стоит попробовать сделать это действие немного позже')
+    await error_handler(error, admin_id, bot, state)
+
+
+@error_router.errors(ExceptionTypeFilter(NoUserException))
+async def no_user(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMContext):
+    message = error.update.message or error.update.callback_query.message
+    await message.answer(f'произошла ошибка при поиске данных пользователя: {error.exception}')
     await error_handler(error, admin_id, bot, state)
 
 

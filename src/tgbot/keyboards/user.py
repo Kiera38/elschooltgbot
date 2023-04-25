@@ -6,7 +6,7 @@ def main_keyboard():
     """Основная клавиатура."""
     return ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text='оценки')],
-        [KeyboardButton(text='регистрация'), KeyboardButton(text='версия')]
+        [KeyboardButton(text='настройки')]
     ], resize_keyboard=True)
 
 
@@ -15,17 +15,10 @@ def grades_keyboard(show_back=False):
     keyboard = [
         [InlineKeyboardButton(text='получить', callback_data='get_grades')],
         [InlineKeyboardButton(text='исправить', callback_data='fix_grades')],
-        [InlineKeyboardButton(text='изменить четверть', callback_data='change_quarter')]
     ]
     if show_back:
         keyboard.append([InlineKeyboardButton(text='назад', callback_data='back_main')])
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
-
-
-def add_cancel(buttons):
-    """Добавить в список кнопок кнопку для отмены действия. Вроде не используется."""
-    buttons.append([KeyboardButton(text='назад'), KeyboardButton(text='отменить')])
-    return buttons
 
 
 def pick_grades_keyboard(lessons=()):
@@ -55,17 +48,11 @@ def pick_grades_inline_keyboard():
     ])
 
 
-def register_keyboard(registered=False):
+def register_keyboard():
     """Клавиатура для страницы регистрация."""
-    if not registered:
-        return InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text='зарегистрироваться', callback_data='register')],
-            [InlineKeyboardButton(text='политика конфиденциальности', callback_data='privacy_policy')]
-        ])
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text='изменить данные', callback_data='change_data')],
         [InlineKeyboardButton(text='удалить данные', callback_data='remove_data')],
-        [InlineKeyboardButton(text='политика конфиденциальности', callback_data='privacy_policy')]
     ])
 
 
@@ -79,3 +66,25 @@ def cancel_keyboard():
 def row_list_keyboard(lst):
     """Клавиатура для показа списка по горизонтали."""
     return ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text=text) for text in lst]], resize_keyboard=True)
+
+
+def settings_keyboard(registered=False):
+    if registered:
+        register_buttons = [
+            InlineKeyboardButton(text='изменить данные', callback_data='change_data'),
+            InlineKeyboardButton(text='удалить данные', callback_data='remove_data')
+        ]
+    else:
+        register_buttons = [InlineKeyboardButton(text='регистрация', callback_data='register')]
+
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='политика конфиденциальности', callback_data='privacy_policy')],
+        register_buttons,
+        [InlineKeyboardButton(text='версия', callback_data='version'),
+         InlineKeyboardButton(text='изменить четверть', callback_data='change_quarter')],
+    ])
+
+def user_agree_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='да', callback_data='yes'), InlineKeyboardButton(text='нет', callback_data='no')]
+    ])
