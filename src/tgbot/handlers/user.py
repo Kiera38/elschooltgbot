@@ -10,7 +10,7 @@ from tgbot.filters.command import CommandFilter
 from tgbot.filters.user import RegisteredUserFilter
 from tgbot.handlers.utils import show_grades, show_fix_grades, show_grades_for_lesson, lower_keys
 from tgbot.keyboards.user import main_keyboard, row_list_keyboard, grades_keyboard, pick_grades_inline_keyboard, \
-    pick_grades_keyboard, register_keyboard, cancel_keyboard, user_agree_keyboard, settings_keyboard
+    pick_grades_keyboard, cancel_keyboard, user_agree_keyboard, settings_keyboard
 from tgbot.middlewares.grades import GradesMiddleware
 from tgbot.services.repository import Repo
 from tgbot.states.user import Change, Page, Register

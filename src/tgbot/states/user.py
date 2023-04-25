@@ -23,7 +23,6 @@ class Page(StatesGroup):
     GRADES = State()
     GET_GRADES = State()
     FIX_GRADES = State()
-    REGISTER = State()
     SETTINGS = State()
 
 

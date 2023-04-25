@@ -48,14 +48,6 @@ def pick_grades_inline_keyboard():
     ])
 
 
-def register_keyboard():
-    """Клавиатура для страницы регистрация."""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='изменить данные', callback_data='change_data')],
-        [InlineKeyboardButton(text='удалить данные', callback_data='remove_data')],
-    ])
-
-
 def cancel_keyboard():
     """Клавиатура для показа отмены действия."""
     return InlineKeyboardMarkup(inline_keyboard=[[
