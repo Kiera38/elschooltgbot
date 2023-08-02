@@ -13,7 +13,7 @@ def main_keyboard():
     ], resize_keyboard=True)
 
 
-def grades_keyboard(all=False, pick=False, summary=False, detail=False, lesson_date=False, date=False,
+def grades_keyboard(all=True, pick=False, summary=False, detail=False, lesson_date=False, date=False,
                     five=False, four=False, three=False, two=False):
     """Клавиатура для страницы оценки."""
     all_key = '✓ все' if all else 'все'
@@ -30,30 +30,36 @@ def grades_keyboard(all=False, pick=False, summary=False, detail=False, lesson_d
         return InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text='показать', callback_data='show')],
             [InlineKeyboardButton(text=summary_key, callback_data='summary'),
-             InlineKeyboardButton(text=detail_key, cllback_data='detail')],
-            [InlineKeyboardButton(text=five_key, callback_data='5'),
-             InlineKeyboardButton(text=four_key, callback_data='4'),
-             InlineKeyboardButton(text=three_key, callback_data='3'),
-             InlineKeyboardButton(text=two_key, callback_data='2')]
+             InlineKeyboardButton(text=detail_key, callback_data='detail')],
+            [InlineKeyboardButton(text=five_key, callback_data='mark5'),
+             InlineKeyboardButton(text=four_key, callback_data='mark4'),
+             InlineKeyboardButton(text=three_key, callback_data='mark3'),
+             InlineKeyboardButton(text=two_key, callback_data='mark2')]
         ])
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text='показать', callback_data='show')],
+
         [InlineKeyboardButton(text=all_key, callback_data='all'),
          InlineKeyboardButton(text=pick_key, callback_data='pick')],
+
         [InlineKeyboardButton(text=summary_key, callback_data='summary'),
-         InlineKeyboardButton(text=detail_key, cllback_data='detail')],
+         InlineKeyboardButton(text=detail_key, callback_data='detail')],
+
         [InlineKeyboardButton(text=lesson_date_key, callback_data='lesson_date'),
          InlineKeyboardButton(text=date_key, callback_data='date')],
-        [InlineKeyboardButton(text=five_key, callback_data='5'), InlineKeyboardButton(text=four_key, callback_data='4'),
-         InlineKeyboardButton(text=three_key, callback_data='3'), InlineKeyboardButton(text=two_key, callback_data='2')]
+
+        [InlineKeyboardButton(text=five_key, callback_data='mark5'),
+         InlineKeyboardButton(text=four_key, callback_data='mark4'),
+         InlineKeyboardButton(text=three_key, callback_data='mark3'),
+         InlineKeyboardButton(text=two_key, callback_data='mark2')]
     ])
 
 
-def pick_grades_keyboard(lessons):
+def pick_lessons_keyboard(lessons):
     """Inline клавиатура, которая показывается при выборе конкретного урока."""
-    buttons = [[InlineKeyboardButton(text=f'✓ {lesson1}' if picked1 else lesson1, callback_data=lesson1),
-                InlineKeyboardButton(text=f'✓ {lesson2}' if picked2 else lesson2, callback_data=lesson2)]
-               for (picked1, lesson1), (picked2, lesson2) in zip(lessons[::2], lessons[1::2])]
+    buttons = [[InlineKeyboardButton(text=f'✓ {lesson1}' if picked1 else lesson1, callback_data=str(i * 2)),
+                InlineKeyboardButton(text=f'✓ {lesson2}' if picked2 else lesson2, callback_data=str(i*2 + 1))]
+               for i, ((picked1, lesson1), (picked2, lesson2)) in enumerate(zip(lessons[::2], lessons[1::2]))]
     return InlineKeyboardMarkup(inline_keyboard=[
         *buttons,
         [InlineKeyboardButton(text='назад', callback_data='back'),
@@ -111,6 +117,12 @@ def pick_year_keyboard(year):
     buttons = [[InlineKeyboardButton(text=str(row_year), callback_data=f'year{row_year}')
                 for row_year in range(column_year-1, column_year+2)] for column_year in range(year-4, year+5, 3)]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def after_show_grades_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='исправить', callback_data='fix')]
+    ])
 
 
 def cancel_keyboard():

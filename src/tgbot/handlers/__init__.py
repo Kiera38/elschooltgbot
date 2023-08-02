@@ -1,7 +1,7 @@
 """Настройка обработчиков для событий telegram"""
 
-from aiogram import Dispatcher
-from aiogram.filters import Command, StateFilter, Text
+from aiogram import Dispatcher, F
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BotCommand, Message, CallbackQuery
 from tgbot.handlers import user, admin, errors, grades
@@ -43,7 +43,7 @@ async def cancel_query(query: CallbackQuery, state: FSMContext):
 def register_handlers(dp: Dispatcher):
     """Добавить все обработчики."""
     dp.message.register(cancel, Command('cancel'), StateFilter('*'))
-    dp.callback_query.register(cancel_query, Text('cancel'))
+    dp.callback_query.register(cancel_query, F.data == 'cancel')
     admin.register_admin(dp)
     grades.register_handlers(dp)
     user.register_user_handlers(dp)

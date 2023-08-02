@@ -78,6 +78,7 @@ async def error_handler(error: ErrorEvent, admin_id: int, bot: Bot, state: FSMCo
             await bot.send_message(admin_id, err_msg)
 
     await handlers.cancel(error.update.message or error.update.callback_query.message, state)
+    raise error.exception
 
 
 def register_errors(dp: Dispatcher):

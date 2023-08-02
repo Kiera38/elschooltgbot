@@ -1,8 +1,8 @@
 """Обработка основных событий, совершённых пользователем."""
 from typing import Union
 
-from aiogram import Router, Dispatcher
-from aiogram.filters import StateFilter, Command, Text
+from aiogram import Router, Dispatcher, F
+from aiogram.filters import StateFilter, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup
 
@@ -61,7 +61,7 @@ async def get_user_quarter(m: Message, state: FSMContext):
         return
 
 
-@router.callback_query(StateFilter(Register.SAVE_DATA), Text('yes'))
+@router.callback_query(StateFilter(Register.SAVE_DATA), F.data == 'yes')
 async def save_user_data(query: CallbackQuery, state: FSMContext, repo: Repo):
     await query.message.answer('хорошо, я сохраню.', reply_markup=main_keyboard())
     data = await state.get_data()
@@ -70,7 +70,7 @@ async def save_user_data(query: CallbackQuery, state: FSMContext, repo: Repo):
     await state.clear()
 
 
-@router.callback_query(StateFilter(Register.SAVE_DATA), Text('no'))
+@router.callback_query(StateFilter(Register.SAVE_DATA), F.data == 'no')
 async def no_save_user_data(query: CallbackQuery, state: FSMContext, repo: Repo):
     await query.message.answer('я не буду сохранять логин и пароль. '
                                'При обновлениях данных я буду их спрашивать у тебя.', reply_markup=main_keyboard())
@@ -80,7 +80,7 @@ async def no_save_user_data(query: CallbackQuery, state: FSMContext, repo: Repo)
 
 
 @router.message(Command('register'))
-@router.callback_query(Text('register'), StateFilter(Page.SETTINGS))
+@router.callback_query(F.data == 'register', StateFilter(Page.SETTINGS))
 async def register_user(message_or_query: Union[Message, CallbackQuery], state: FSMContext):
     """Регистрация """
     if isinstance(message_or_query, CallbackQuery):
@@ -94,14 +94,14 @@ async def register_user(message_or_query: Union[Message, CallbackQuery], state: 
     await privacy_policy(message, state)
 
 
-@router.callback_query(StateFilter(Register.SHOW_PRIVACY_POLICY), Text('yes'))
+@router.callback_query(StateFilter(Register.SHOW_PRIVACY_POLICY), F.data == 'yes')
 async def register_login(query: CallbackQuery, state: FSMContext):
     await state.set_state(Register.LOGIN)
     await query.message.edit_text('ну вот хорошо. Для начала введи логин.',
                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
 
 
-@router.callback_query(StateFilter(Register.SHOW_PRIVACY_POLICY), Text('no'))
+@router.callback_query(StateFilter(Register.SHOW_PRIVACY_POLICY), F.data == 'no')
 async def exit_user(query: CallbackQuery, state: FSMContext):
     await state.clear()
     await query.message.answer('ну и не пользуйся, раз не согласен.', reply_markup=main_keyboard())
@@ -122,7 +122,7 @@ async def update_cache(m: Message, repo: Repo):
     await m.answer(f'оценки обновлены за {time: .3f} с')
 
 
-@registered_router.callback_query(Text('back_main'))
+@registered_router.callback_query(F.data == 'back_main')
 async def back_main(query: CallbackQuery, state: FSMContext):
     """Обработка кнопки назад для возврата к основной странице."""
     await state.clear()
@@ -138,14 +138,14 @@ async def user_start(m: Message):
                   "чтобы узнать как пользоваться используй /help", reply_markup=main_keyboard())
 
 
-@router.message(Text('настройки'))
+@router.message(F.text == 'настройки')
 async def settings(message: Message, state: FSMContext, repo: Repo):
     await state.set_state(Page.SETTINGS)
     await message.answer('настройки', reply_markup=settings_keyboard(await repo.check_has_user(message.from_user.id)))
 
 
 @router.message(Command('version'))
-@router.callback_query(Text('version'), StateFilter(Page.SETTINGS))
+@router.callback_query(F.data == 'version', StateFilter(Page.SETTINGS))
 async def version(message_or_query: Union[Message, CallbackQuery]):
     """Показать версию и список изменений."""
     if isinstance(message_or_query, CallbackQuery):
@@ -153,7 +153,7 @@ async def version(message_or_query: Union[Message, CallbackQuery]):
         message = message_or_query.message
     else:
         message = message_or_query
-    await message.answer("""моя версия: 2.6.23.dev1 (обновление 4.0)
+    await message.answer("""моя версия: 2.7.1.dev1 (обновление 4.0)
 список изменений:
 Бот теперь использует базу данных вместо обычного файла для хранения данных о пользователях.
 Исправлена ошибка, из-за которой нельзя было использовать команды.
@@ -164,7 +164,7 @@ async def version(message_or_query: Union[Message, CallbackQuery]):
 @router.message(Command('version_comments'))
 async def version_comments(m: Message):
     """Подробно показать список изменений."""
-    await m.answer("""моя версия: 2.6.23.dev1 (обновление 4.0)
+    await m.answer("""моя версия: 2.7.1.dev1 (обновление 4.0)
 
 Бот теперь использует базу данных вместо обычного файла для хранения данных о пользователях. (возможно увеличение производительности).
 Исправлена ошибка, из-за которой нельзя было использовать команды. (ошибка страшная, но решалась очень легко)
@@ -211,7 +211,7 @@ async def quarter_changed(m: Message, state: FSMContext, repo: Repo):
 
 
 @registered_router.message(Command('change_quarter'))
-@registered_router.callback_query(Text('change_quarter'), StateFilter(Page.SETTINGS))
+@registered_router.callback_query(F.data == 'change_quarter', StateFilter(Page.SETTINGS))
 async def change_quarter(message_or_query: Union[Message, CallbackQuery], repo: Repo, state: FSMContext):
     """Пользователь захотел изменить четверть из клавиатуры."""
     message = message_or_query.message if isinstance(message_or_query, CallbackQuery) else message_or_query
@@ -221,7 +221,7 @@ async def change_quarter(message_or_query: Union[Message, CallbackQuery], repo: 
 
 
 @router.message(Command('privacy_policy'))
-@router.callback_query(Text('privacy_policy'), StateFilter(Page.SETTINGS))
+@router.callback_query(F.data == 'privacy_policy', StateFilter(Page.SETTINGS))
 async def privacy_policy(message_or_query: Union[Message, CallbackQuery], state: FSMContext):
     """Показать политику конфиденциальности."""
     message = message_or_query.message if isinstance(message_or_query, CallbackQuery) else message_or_query
@@ -262,7 +262,7 @@ async def change_password(m: Message, state: FSMContext, repo: Repo):
 
 
 @registered_router.message(Command('change_data'))
-@registered_router.callback_query(Text('change_data'), StateFilter(Page.SETTINGS))
+@registered_router.callback_query(F.data == 'change_data', StateFilter(Page.SETTINGS))
 async def change_data(message_or_query: Union[Message, CallbackQuery], state: FSMContext):
     """Пользователь захотел изменить данные с помощью кнопки на клавиатуре."""
     if isinstance(message_or_query, CallbackQuery):
@@ -275,7 +275,7 @@ async def change_data(message_or_query: Union[Message, CallbackQuery], state: FS
 
 
 @registered_router.message(Command('remove_data'))
-@registered_router.callback_query(Text('remove_data'), StateFilter(Page.SETTINGS))
+@registered_router.callback_query(F.data == 'remove_data', StateFilter(Page.SETTINGS))
 async def remove_data(message_or_query: CallbackQuery, repo: Repo, state: FSMContext):
     """Пользователь захотел изменить данные с помощью кнопки на клавиатуре."""
     if isinstance(message_or_query, CallbackQuery):

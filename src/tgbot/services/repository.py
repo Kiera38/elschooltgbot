@@ -64,29 +64,37 @@ class Repo:
         logger.info(f'получены новые оценки за {end - start}')
         return grades, end - start, url
 
-    async def get_grades(self, user_id):
-        """Получить оценки для пользователя."""
+    async def prepare_cache_grades(self, user_id):
         async with self.db.cursor() as cursor:
             await cursor.execute('SELECT last_cache, quarter, jwtoken, url FROM Users WHERE id=?', (user_id,))
             if data := await cursor.fetchone():
                 last_cache, quarter, jwtoken, url = data
             else:
                 raise NoUserException('такого пользователя не существует')
-            if time.time() - last_cache < 3600:
-                await cursor.execute('SELECT name, date, value FROM QuarterLessonMarks WHERE user_id=? AND quarter=?',
-                                     (user_id, quarter))
-                cached_grades = {}
-                async for name, date, value in cursor:
-                    if name not in cached_grades:
-                        cached_grades[name] = []
-                    if value != 0:
-                        cached_grades[name].append({
-                            'date': date,
-                            'value': value
-                        })
-                return cached_grades, 0
+            if time.time() - last_cache > 3600:
+                return await self._update_cache(cursor, user_id, quarter, jwtoken, url)
+            return 0
 
-            return await self._update_cache(cursor, user_id, quarter, jwtoken, url)
+    async def get_grades(self, user_id):
+        """Получить оценки для пользователя."""
+        async with self.db.cursor() as cursor:
+            await cursor.execute('SELECT quarter FROM Users WHERE id=?', (user_id,))
+            if data := await cursor.fetchone():
+                quarter = data[0]
+            else:
+                raise NoUserException('такого пользователя не существует')
+            await cursor.execute('SELECT name, date, value FROM QuarterLessonMarks WHERE user_id=? AND quarter=?',
+                                 (user_id, quarter))
+            cached_grades = {}
+            async for name, date, value in cursor:
+                if name not in cached_grades:
+                    cached_grades[name] = []
+                if value != 0:
+                    cached_grades[name].append({
+                        'date': date,
+                        'value': value
+                    })
+            return cached_grades
 
     async def has_user(self, user_id):
         """Существует ли пользователь с определённым id"""
@@ -128,7 +136,7 @@ class Repo:
                                  [(user_id, quarter, name, value['date'], value['value'])
                                   for name, values in quarter_grades.items() for value in values])
         await self.db.commit()
-        return grades[quarter], get_time
+        return get_time
 
     async def get_quarters(self, user_id):
         async with self.db.execute('SELECT DISTINCT quarter FROM QuarterLessonMarks WHERE user_id = ?',

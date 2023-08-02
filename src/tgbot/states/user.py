@@ -21,8 +21,8 @@ class Change(StatesGroup):
 class Page(StatesGroup):
     """Состояния для разных страниц бота"""
     GRADES = State()
-    GET_GRADES = State()
-    FIX_GRADES = State()
+    PICK_LESSONS = State()
+    AFTER_SHOW_GRADES = State()
     SETTINGS = State()
 
 

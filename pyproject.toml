@@ -7,7 +7,7 @@ package-dir = { "" = "src" }
 
 [project]
 name = "elschool_bot"
-version = "2.6.23.dev1"
+version = "2.7.1.dev1"
 authors = [
     { name = "Maxim", email = "maxim@filjus.ru" },
 ]

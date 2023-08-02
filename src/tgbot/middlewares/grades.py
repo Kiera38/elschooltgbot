@@ -17,21 +17,24 @@ class GradesMiddleware(BaseMiddleware):
                        data: Dict[str, Any]) -> Any:
         user: types.User = data['event_from_user']
         repo: Repo = data['repo']
-        m = event if isinstance(event, Message) else event.message
-        message = await m.answer('получаю оценки')
+        if isinstance(event, Message):
+            message = await event.answer('получаю оценки')
+        else:
+            await event.message.edit_text('получаю оценки')
+            message = event.message
+        data['grades_message'] = message
 
         try:
-            grades, time = await repo.get_grades(user.id)
+            time = await repo.prepare_cache_grades(user.id)
         except NoDataException:
-            login, password = await data['repo'].get_user_data(user.id)
+            login, password = await repo.get_user_data(user.id)
             if login is not None and password is not None:
-                repo = data['repo']
                 await message.edit_text('мне не удалось получить оценки из elschool. '
                                         'Скорее всего, это произошло из-за того, что elschool обновил данные. '
                                         'Так-как ты сохранил логин и пароль я их обновлю.')
                 jwtoken = await repo.register_user(login, password)
                 await repo.update_user_token(user.id, jwtoken)
-                grades, time = await repo.get_grades(user.id)
+                time = await repo.prepare_cache_grades(user.id)
                 await message.edit_text(f'получилось обновить данные и заново получить оценки. '
                                         f'Оценки получил за {time: .3f}')
             else:
@@ -45,5 +48,4 @@ class GradesMiddleware(BaseMiddleware):
         else:
             if time:
                 await message.edit_text(f'оценки получил за {time: .3f}')
-        data['grades'] = grades
         return await handler(event, data)
